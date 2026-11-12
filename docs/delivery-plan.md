@@ -7,7 +7,9 @@
 ## Decisões deste plano
 
 - **Deploy desde a E0.** A primeira entrega já vai para um ambiente público com HTTPS e autenticação. Consequência: hospedagem (q3) e autenticação (q2) passam a ser decisões de scaffolding.
-- **Hospedagem:** decidida no `scaffolding-brainstorm`.
+- **Hospedagem (q3, resolvida):** VPS (Hostinger KVM 2, Brasil) com Docker Compose e Caddy; frontend e API na mesma origem; Postgres em container no VPS com backup diário criptografado em storage externo. Ver [ADR 0001](adr/0001-hosting-vps-compose-caddy.md) e [ADR 0002](adr/0002-postgres-on-vps-with-offsite-backup.md).
+- **Autenticação (q2, resolvida):** e-mail + senha com sessão server-side em cookie `HttpOnly`. Ver [ADR 0003](adr/0003-auth-password-server-side-sessions.md).
+- **Scaffolding completo:** [`scaffolding-specification.md`](scaffolding-specification.md).
 - **Infraestrutura entra só quando necessária:** Redis/fila na E2, object storage na E4.
 - **Ordem:** captura → enriquecimento → revisão (a IA vem antes da revisão).
 
@@ -15,7 +17,7 @@
 
 | Entrega | Valor para o usuário | Infraestrutura nova | Decisões necessárias |
 |---|---|---|---|
-| E0 | (nenhum, só risco reduzido) | Deploy, CI/CD, autenticação, Postgres | q2, q3 |
+| E0 | (nenhum, só risco reduzido) | Deploy, CI/CD, autenticação, Postgres | q2, q3 (resolvidas) |
 | E1 | Para de perder palavras | — | — |
 | E2 | Termos explicados automaticamente | Fila, worker, LLM | q4, q5 |
 | E3 | Hábito diário de revisão | FSRS | q10 |
@@ -34,17 +36,18 @@ Ao final da E5, o **critério de pronto do MVP** (seção 14) é atingido.
 - Monorepo `backend/` + `frontend/`.
 - Backend FastAPI com estrutura em camadas (seção 8.2), `GET /health`, configuração via `.env`, logs estruturados, Alembic com a migração inicial (`User`).
 - Frontend Vite + React + TS, roteamento, layout base, PWA mínima instalável, client gerado do OpenAPI, tela que consome `/health`.
-- Autenticação simples (login/logout + rota protegida).
-- Qualidade: Ruff, mypy/pyright, pytest, ESLint, Prettier, Vitest, com um teste de exemplo em cada lado.
-- `docker-compose` local apenas com Postgres.
-- CI (lint + testes a cada push) e CD (deploy automático na `main`).
-- Produção com HTTPS, banco gerenciado e segredos fora do repositório.
+- Autenticação simples (login/logout + rota protegida): e-mail + senha, sessão server-side em cookie.
+- Qualidade: Ruff, mypy, pytest, ESLint, Prettier, Vitest, com um teste de exemplo em cada lado.
+- `compose.yaml` local apenas com Postgres.
+- CI (lint + testes a cada push) e CD (deploy automático na `main`, com rollback automático).
+- Produção com HTTPS (VPS + Caddy), Postgres em container com backup diário criptografado em storage externo e segredos fora do repositório.
+- Detalhes: [`scaffolding-specification.md`](scaffolding-specification.md).
 
 **Fora do escopo:** qualquer `F-xx`, fila, worker, storage de arquivos.
 
-**Decisões necessárias:** q2 (autenticação), q3 (hospedagem).
+**Decisões necessárias:** q2 (autenticação) e q3 (hospedagem), ambas resolvidas no `scaffolding-brainstorm` (ADRs 0001–0003).
 
-**Pronto quando:** a URL pública abre no celular, a PWA instala, o login funciona e o status do backend aparece; um push na `main` publica automaticamente.
+**Pronto quando:** a URL pública abre no celular, a PWA instala, o login funciona e o status do backend aparece; um merge na `main` publica automaticamente; o backup diário chega ao storage externo e um restore de teste funciona.
 
 ---
 
