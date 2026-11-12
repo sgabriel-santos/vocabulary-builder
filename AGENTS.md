@@ -6,6 +6,8 @@ Instruções para agentes de IA que trabalham neste repositório. Este é o docu
 
 **Vocabulary Builder**: PWA de uso pessoal (single-user, com `user_id` no modelo para não bloquear multiusuário) que transforma palavras e expressões em inglês anotadas pelo usuário em vocabulário ativo: captura, enriquecimento por IA, repetição espaçada (FSRS), pronúncia, diário e estúdio de vídeo.
 
+**Projeto pessoal, não acadêmico.** Apesar de o repositório ficar numa pasta `FIAP/`, não é trabalho da FIAP nem tem avaliação: o objetivo é o aprendizado de inglês do próprio desenvolvedor. Arquitetura e infraestrutura se justificam pelo uso real, não por demonstrar padrões.
+
 Leia antes de começar:
 
 | Documento | Conteúdo |
@@ -34,8 +36,8 @@ Versões exatas ficam nos lockfiles (`backend/uv.lock`, `frontend/pnpm-lock.yaml
 | Rotas HTTP e schemas de request/response | `backend/app/api/v1/` (`schemas/`) |
 | Entidades e regras de negócio puras | `backend/app/domain/` |
 | Casos de uso | `backend/app/application/` |
-| Interfaces (Protocol) de provedores e repositórios | `backend/app/ports/` |
-| Implementações (banco, segurança, provedores externos) | `backend/app/adapters/` (`db/models/`, `db/repositories/`, `security/`, ...) |
+| Interfaces (Protocol) de provedores, infraestrutura (`Clock`, `PasswordHasher`) e repositórios de agregados com regra | `backend/app/ports/` |
+| Implementações (banco, segurança, provedores externos) | `backend/app/adapters/` (`db/models/`, `security/`, ...; `db/repositories/` quando houver agregado com regra) |
 | Config, logging, middlewares, composition root (DI) | `backend/app/core/` |
 | CLI administrativa | `backend/app/cli/` |
 | Migrações | `backend/migrations/versions/` |
@@ -75,9 +77,10 @@ just --list                # todas as receitas
 ## Faça
 
 - Coloque regras de negócio em `domain/`/`application/`, nunca em routers.
+- Em CRUD e leituras simples, use a `AsyncSession` direto na `application/`; crie port de repositório só para agregado com regra de negócio (spec §7.6).
 - Acesse provedores externos **somente via port** e crie o fake correspondente em `backend/tests/fakes/`. Repositórios não precisam de fake em memória (os testes usam Postgres real).
 - Use o port `Clock` para qualquer lógica dependente de tempo.
-- Escreva testes no nível certo: `unit` (sem banco), `integration` (repositórios/migrações), `api` (endpoints com fakes de provedores).
+- Escreva testes no nível certo: `unit` (sem banco), `integration` (migrações, constraints, repositórios quando existirem), `api` (endpoints com fakes de provedores).
 - Valide toda saída de LLM com Pydantic; prompts versionados em arquivos dedicados (a partir da E2).
 - Rode `just gen-client` sempre que alterar rotas ou schemas da API (o CI falha em drift).
 - Mantenha `.env.example` atualizado ao adicionar configuração.
@@ -91,7 +94,7 @@ just --list                # todas as receitas
 - Não chame APIs pagas reais em testes automatizados.
 - Não armazene tokens de autenticação no `localStorage`/`sessionStorage`; a sessão é um cookie `HttpOnly` gerenciado pelo backend.
 - Não exponha modelos SQLAlchemy na camada `api/` nem retorne-os diretamente.
-- Não edite à mão arquivos gerados: `frontend/src/routeTree.gen.ts`, `frontend/src/api/openapi.json`, `frontend/src/api/schema.d.ts`.
+- Não edite à mão arquivos gerados: `frontend/src/routeTree.gen.ts`, `frontend/src/api/schema.d.ts`.
 - Não publique portas de serviços além do `web` (Caddy) no compose de produção; não monte `/var/run/docker.sock` em containers.
 - Não use tags `latest` de imagens.
 - Não adicione cache de `/api/*` no service worker (offline está fora do escopo).

@@ -3,7 +3,7 @@
 > **Propósito deste documento:** servir como fonte única de contexto de alto nível para agentes de IA (e humanos) que vão participar do desenvolvimento. Ele descreve o problema, os objetivos, o escopo funcional, as decisões técnicas já tomadas, o modelo de domínio proposto, o roadmap e as questões em aberto.
 >
 > **Status:** ideia inicial / pré-desenvolvimento.
-> **Versão do documento:** 1.2 — resolve q2 (autenticação) e q3 (hospedagem), consolida a stack escolhida no scaffolding (ver [`scaffolding-specification.md`](scaffolding-specification.md) e [`adr/`](adr/README.md)). Versão 1.1 adicionou F-16 (gerador de palavras frequentes), F-17 (estúdio de vídeo), F-18 (diário) e F-19 (modelo do aprendiz).
+> **Versão do documento:** 1.3 — registra que é um projeto pessoal, não acadêmico (§3). Versão 1.2 resolve q2 (autenticação) e q3 (hospedagem), consolida a stack escolhida no scaffolding (ver [`scaffolding-specification.md`](scaffolding-specification.md) e [`adr/`](adr/README.md)). Versão 1.1 adicionou F-16 (gerador de palavras frequentes), F-17 (estúdio de vídeo), F-18 (diário) e F-19 (modelo do aprendiz).
 > **Nome do projeto:** provisório ("Vocabulary Builder"). Pode ser alterado.
 > **Idioma do código:** inglês (nomes de variáveis, classes, tabelas, endpoints, commits). **Idioma da documentação e da interface:** português (pt-BR), com o conteúdo de estudo em inglês.
 
@@ -67,6 +67,7 @@ Um aplicativo web (instalável no celular como PWA) onde o usuário **joga palav
 ## 3. Público-alvo e premissas
 
 - **Uso pessoal, single-user.** Não é um produto comercial neste momento. Publicação e eventual abertura a outros usuários serão tratadas no futuro.
+- **Projeto pessoal, não acadêmico.** Apesar de o repositório ficar numa pasta `FIAP/`, este **não** é um trabalho da FIAP nem tem avaliação. O objetivo é o aprendizado de inglês do próprio usuário. Decisões de arquitetura e infraestrutura se justificam pelo uso real, não por demonstrar padrões.
 - O usuário é falante nativo de português (pt-BR), aprendendo inglês, com nível intermediário (premissa; ver questões em aberto).
 - O usuário é desenvolvedor fullstack experiente (foco em backend, experiência como tech lead). O projeto também pode servir como ambiente de aprendizado e experimentação.
 - Consequências da premissa single-user:

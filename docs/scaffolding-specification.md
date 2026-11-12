@@ -4,7 +4,9 @@
 >
 > **Origem:** decisões tomadas no brainstorm de scaffolding (skill `scaffolding-brainstorm`), registradas como ADRs em [`docs/adr/`](adr/README.md).
 >
-> **Status:** aprovado · **Data:** 2026-11-12 · **Revisão:** E0 enxugada (backup movido para a E1, rollback manual, sem fakes em memória de repositórios, deploy em workflow único, Dependabot mensal)
+> **Status:** aprovado · **Data:** 2026-11-12 · **Revisão:** E0 enxugada (backup movido para a E1, rollback manual, sem fakes em memória de repositórios, deploy em workflow único, Dependabot mensal) · **2ª revisão:** auth sem ports de repositório, deploy sem `command=` no SSH, client versiona só o `schema.d.ts`, sem `just prod-local` e sem hook `commit-msg`, tabelas iniciais mínimas
+>
+> **Fonte da verdade após a implementação:** os trechos de referência deste documento (Dockerfile, Caddyfile, compose, workflows, receitas) servem para montar o scaffolding. Depois que os arquivos reais existirem, **eles prevalecem**; esta spec não é atualizada para espelhá-los, apenas quando uma decisão mudar.
 >
 > **Fora deste documento:** cronograma, tarefas e ordem de implementação (ficam no Blueprint gerado pela skill `scaffolding-blueprint`).
 
@@ -152,11 +154,10 @@ vocabulary-builder/
 │   │   ├── domain/                  # Entidades (dataclasses) e regras puras; sem I/O, sem SQLAlchemy
 │   │   │   └── auth.py              # Ex.: regra de expiração/renovação de sessão
 │   │   ├── application/             # Casos de uso: orquestram domínio + ports
-│   │   │   └── auth/                # login, logout, resolve_session, create_user
+│   │   │   └── auth/                # login, logout, resolve_session, create_user (usam a AsyncSession direto)
 │   │   ├── ports/                   # Interfaces (typing.Protocol)
 │   │   │   ├── clock.py             # Clock: now() -> datetime (UTC)
-│   │   │   ├── password_hasher.py   # PasswordHasher: hash/verify
-│   │   │   └── repositories.py      # UserRepository, SessionRepository
+│   │   │   └── password_hasher.py   # PasswordHasher: hash/verify
 │   │   ├── adapters/                # Implementações dos ports
 │   │   │   ├── clock.py             # SystemClock
 │   │   │   ├── security/
@@ -164,14 +165,13 @@ vocabulary-builder/
 │   │   │   └── db/
 │   │   │       ├── base.py          # DeclarativeBase, convenções de nome de constraints, mixins (id, timestamps)
 │   │   │       ├── engine.py        # create_async_engine / async_sessionmaker
-│   │   │       ├── models/          # Modelos SQLAlchemy (Mapped[...]): user.py, session.py
-│   │   │       └── repositories/    # SqlUserRepository, SqlSessionRepository
+│   │   │       └── models/          # Modelos SQLAlchemy (Mapped[...]): user.py, session.py
 │   │   ├── core/                    # Infraestrutura transversal
 │   │   │   ├── config.py            # Settings (pydantic-settings)
 │   │   │   ├── logging.py           # Configuração do structlog
 │   │   │   ├── middleware.py        # Request-id, logging de acesso
 │   │   │   ├── rate_limit.py        # Rate limit em memória para o login
-│   │   │   └── container.py         # Composition root: monta adapters a partir do Settings
+│   │   │   └── container.py         # Composition root: providers (clock, hasher, sessão de DB)
 │   │   ├── cli/
 │   │   │   └── __main__.py          # `python -m app.cli create-user <email>` (senha via prompt)
 │   │   └── scripts/
@@ -180,7 +180,7 @@ vocabulary-builder/
 │       ├── conftest.py              # Fixtures globais (settings de teste, clock fake)
 │       ├── fakes/                   # Fakes de ports de provedores/infra: FakeClock, FakePasswordHasher
 │       ├── unit/                    # Domínio e casos de uso com fakes (sem DB)
-│       ├── integration/             # Repositórios e migrações contra Postgres real (testcontainers)
+│       ├── integration/             # Migrações e constraints contra Postgres real (testcontainers)
 │       │   └── conftest.py          # Container Postgres, alembic upgrade head, sessão com rollback
 │       └── api/                     # App completo via httpx + ASGITransport, DB real, provedores fake
 │           └── conftest.py          # AsyncClient com dependency_overrides
@@ -213,13 +213,12 @@ vocabulary-builder/
         │   └── _authenticated/
         │       └── index.tsx        # / (home protegida: status do backend)
         ├── api/
-        │   ├── openapi.json         # GERADO (just gen-client) — versionado
-        │   ├── schema.d.ts          # GERADO (openapi-typescript) — versionado
+        │   ├── schema.d.ts          # GERADO (just gen-client) — versionado, não editar
         │   ├── client.ts            # createClient<paths>() do openapi-fetch + $api (openapi-react-query)
         │   └── query-client.ts      # Instância do QueryClient e defaults
         ├── features/                # Código por funcionalidade (cresce a cada entrega)
-        │   ├── auth/                # LoginForm.tsx, useLogin.ts, useLogout.ts, useCurrentUser.ts
-        │   └── health/              # HealthStatus.tsx, useHealth.ts
+        │   ├── auth/                # LoginForm.tsx, useLogin.ts, useLogout.ts (invalidam `me` e redirecionam)
+        │   └── health/              # HealthStatus.tsx (usa $api direto, sem hook próprio)
         ├── components/
         │   ├── ui/                  # Componentes shadcn/ui (gerados via CLI, editáveis)
         │   └── layout/              # AppShell.tsx, etc.
@@ -232,7 +231,7 @@ vocabulary-builder/
 Regras de localização:
 
 - **Regra de negócio** → `backend/app/domain/` (puro) e `backend/app/application/` (orquestração). Nunca em routers.
-- **Acesso a banco** → apenas em `backend/app/adapters/db/`. A camada `application/` usa repositórios (ports) para agregados com regra e pode consultar o ORM diretamente apenas em **leituras simples** (listagens/filtros), devolvendo DTOs.
+- **Acesso a banco** → modelos e engine em `backend/app/adapters/db/`. A camada `application/` usa a `AsyncSession` e os modelos ORM diretamente em **CRUD e leituras simples**, devolvendo DTOs/dataclasses. Repositório (port em `ports/` + implementação em `adapters/db/repositories/`) só para **agregados com regra de negócio**, e o primeiro nasce junto com o primeiro agregado desse tipo (ex.: `Card`/FSRS na E3), não antes.
 - **Provedores externos** (a partir da E2) → port em `ports/`, implementação em `adapters/<tipo>/`, fake em `tests/fakes/`.
 - **Frontend**: telas e hooks de cada funcionalidade em `src/features/<feature>/`; rotas em `src/routes/` são finas (montam componentes de `features/`).
 
@@ -300,7 +299,7 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 | `typescript` | `strict: true`. |
 | `@tanstack/router-plugin` | Gera `routeTree.gen.ts` a partir de `src/routes/`. |
 | `vite-plugin-pwa` | Manifest + service worker. |
-| `openapi-typescript` | Gera `schema.d.ts` a partir do `openapi.json`. |
+| `openapi-typescript` | Gera `schema.d.ts` a partir do OpenAPI exportado pelo backend. |
 | `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom` | Testes de componentes. |
 | `msw`, `openapi-msw` | Mock da API tipado. |
 | `eslint`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `eslint-config-prettier` | Lint. |
@@ -331,10 +330,10 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 | Contexto | Convenção | Exemplo |
 |---|---|---|
 | Módulos/pacotes Python | `snake_case` | `password_hasher.py` |
-| Classes Python | `PascalCase` | `SqlSessionRepository` |
+| Classes Python | `PascalCase` | `Argon2PasswordHasher` |
 | Funções/variáveis Python | `snake_case` | `resolve_session()` |
-| Ports | substantivo do papel, sem prefixo `I` | `Clock`, `UserRepository` |
-| Adapters | tecnologia + papel | `Argon2PasswordHasher`, `SqlUserRepository` |
+| Ports | substantivo do papel, sem prefixo `I` | `Clock`, `PasswordHasher` |
+| Adapters | tecnologia + papel | `SystemClock`, `Argon2PasswordHasher` |
 | Fakes | `Fake` / `InMemory` + papel | `FakeClock`, `FakePasswordHasher` |
 | Tabelas | plural `snake_case` | `users`, `sessions` |
 | Colunas | `snake_case`; FKs `<entidade>_id`; timestamps `*_at` (UTC, `timestamptz`) | `user_id`, `expires_at` |
@@ -355,7 +354,7 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 - **Branches curtas** a partir da `main`: `feat/F-01-term-capture`, `fix/...`, `chore/...`, `docs/...`, `refactor/...`, `test/...`, `ci/...`.
 - **Toda mudança chega à `main` por PR.** Ruleset da `main`: sem push direto, status checks do CI obrigatórios, histórico linear, sem force push. Sem aprovação obrigatória (projeto solo).
 - **Squash merge**: o título do PR vira o commit na `main` e deve seguir Conventional Commits, referenciando `F-xx` quando aplicável (ex.: `feat(capture): add term capture and bulk import (F-01)`).
-- **Commits**: regras do [`CLAUDE.md`](../CLAUDE.md) (inglês, Conventional Commits, título imperativo ≤ ~72 caracteres, corpo opcional em tópicos, **sem atribuição de IA**, aprovação explícita do usuário antes de cada commit feito por agente). O hook de pre-commit valida o formato da mensagem.
+- **Commits**: regras do [`CLAUDE.md`](../CLAUDE.md) (inglês, Conventional Commits, título imperativo ≤ ~72 caracteres, corpo opcional em tópicos, **sem atribuição de IA**, aprovação explícita do usuário antes de cada commit feito por agente). Com squash merge, o que chega à `main` é o **título do PR**, conferido no momento do merge; por isso não há hook `commit-msg`.
 
 ### 4.4 Banco e migrações
 
@@ -438,9 +437,11 @@ O `Settings` lê `postgres_password` de `/run/secrets` (campo `postgres_password
 
 ### 6.2 Tabelas (migração inicial)
 
-**`users`**: `id` (UUID, PK), `email` (único, normalizado em minúsculas), `password_hash`, `display_name` (opcional), `settings` (JSONB, default `{}`), `created_at`, `updated_at`.
+**`users`**: `id` (UUID, PK), `email` (único, normalizado em minúsculas), `password_hash`, `created_at`, `updated_at`.
 
-**`sessions`**: `id` (UUID, PK), `user_id` (FK → `users`, `ON DELETE CASCADE`), `token_hash` (único; SHA-256 do token), `created_at`, `last_seen_at`, `expires_at` (indexado), `user_agent` (opcional).
+**`sessions`**: `id` (UUID, PK), `user_id` (FK → `users`, `ON DELETE CASCADE`), `token_hash` (único; SHA-256 do token), `created_at`, `last_seen_at`, `expires_at` (indexado).
+
+Apenas as colunas que a E0 usa. Os demais campos do `User` (overview §9.2: `display_name`, `settings`) entram por migração na entrega que os usar.
 
 ### 6.3 Fluxos
 
@@ -448,7 +449,7 @@ O `Settings` lê `postgres_password` de `/run/secrets` (campo `postgres_password
 |---|---|
 | `POST /api/v1/auth/login` `{email, password}` | Rate limit por IP. Verifica a senha (tempo constante; resposta genérica em erro). Gera token `secrets.token_urlsafe(32)`, grava `sha256(token)` em `sessions` com `expires_at = now + SESSION_TTL_DAYS`, responde `204` com `Set-Cookie`. |
 | `POST /api/v1/auth/logout` | Apaga a sessão atual e expira o cookie. `204`. |
-| `GET /api/v1/auth/me` | Retorna o usuário autenticado (`id`, `email`, `display_name`) ou `401`. |
+| `GET /api/v1/auth/me` | Retorna o usuário autenticado (`id`, `email`) ou `401`. |
 | `GET /api/v1/health` | Público. Retorna status da API e do banco (`SELECT 1`). |
 
 **Cookie**: `vocab_session=<token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=<TTL>` (`Secure` desligado apenas em dev via `SESSION_COOKIE_SECURE=false`).
@@ -474,19 +475,19 @@ O `Settings` lê `postgres_password` de `/run/secrets` (campo `postgres_password
 | Camada | Pode depender de | Não pode depender de |
 |---|---|---|
 | `domain/` | biblioteca padrão | FastAPI, SQLAlchemy, Pydantic de API, adapters |
-| `application/` | `domain/`, `ports/` (e ORM apenas em leituras simples) | `api/`, adapters concretos |
+| `application/` | `domain/`, `ports/`, modelos ORM e `AsyncSession` (CRUD e leituras simples) | `api/`, adapters concretos de provedores |
 | `ports/` | `domain/` | adapters |
 | `adapters/` | `ports/`, `domain/`, bibliotecas externas | `api/` |
 | `api/` | `application/`, `core/`, schemas | adapters concretos (recebe via DI) |
 | `core/` | tudo (é a composition root) | — |
 
 - Entidades de domínio: `@dataclass` (preferencialmente `frozen` ou com métodos de regra explícitos).
-- Modelos SQLAlchemy em `adapters/db/models/`, nunca expostos fora de `adapters/` exceto em leituras simples da camada `application/`.
+- Modelos SQLAlchemy em `adapters/db/models/`; podem ser usados pela `application/`, mas **nunca** chegam à camada `api/` (a `application/` devolve DTOs/dataclasses).
 - Schemas de request/response (Pydantic) em `api/v1/schemas/`; nunca retornar modelos ORM diretamente.
 
 ### 7.2 Injeção de dependência
 
-- `Depends` do FastAPI. `core/container.py` expõe funções provider (`get_clock`, `get_password_hasher`, `get_db_session`, `get_user_repository`...) que montam os adapters a partir do `Settings`.
+- `Depends` do FastAPI. `core/container.py` expõe funções provider (`get_clock`, `get_password_hasher`, `get_db_session`...) que montam os adapters a partir do `Settings`.
 - Testes substituem providers com `app.dependency_overrides[...]`.
 - Sem biblioteca de container.
 
@@ -515,10 +516,10 @@ O `Settings` lê `postgres_password` de `/run/secrets` (campo `postgres_password
 |---|---|---|
 | `Clock` | `SystemClock` (UTC) | `FakeClock` (tempo controlável) |
 | `PasswordHasher` | `Argon2PasswordHasher` | `FakePasswordHasher` (rápido, determinístico) |
-| `UserRepository` | `SqlUserRepository` | — |
-| `SessionRepository` | `SqlSessionRepository` | — |
 
-**Repositórios não ganham fake em memória por padrão.** Os testes de integração e de API já usam Postgres real (testcontainers), então um `InMemory*Repository` só duplicaria o repositório SQL e precisaria ser mantido em paralelo. A regra de negócio fica em funções/entidades puras de `domain/` (testadas em `unit/`), e os casos de uso que dependem de repositório são cobertos pelos testes de `api/`. Crie um fake de repositório apenas se surgir um teste unitário que realmente precise dele.
+**Sem ports de repositório na E0.** `users` e `sessions` são CRUD sem regra de negócio: os casos de uso de `application/auth/` usam a `AsyncSession` diretamente. A única regra (expiração/renovação da sessão) é uma função pura em `domain/auth.py`, testada em `unit/` com `FakeClock`; o fluxo completo é coberto pelos testes de `api/`. O primeiro repositório nasce com o primeiro agregado com regra de negócio (ex.: `Card` na E3).
+
+**Repositórios não ganham fake em memória por padrão.** Os testes de integração e de API usam Postgres real (testcontainers); um `InMemory*Repository` só duplicaria o SQL. Crie um fake de repositório apenas se surgir um teste unitário que realmente precise dele.
 
 Os ports de provedores externos do overview §8.2 (`LLMProvider`, `TTSProvider` etc.) entram nas entregas que os usam.
 
@@ -536,8 +537,8 @@ Os ports de provedores externos do overview §8.2 (`LLMProvider`, `TTSProvider` 
 ### 8.2 Client da API
 
 - `src/api/client.ts`: `createClient<paths>({ baseUrl: "/" })` (openapi-fetch) e `$api = createQueryClient(client)` (openapi-react-query).
-- Hooks por feature, finos, em `src/features/<feature>/use*.ts`, por exemplo `useHealth = () => $api.useQuery("get", "/api/v1/health")`.
-- Nunca editar `openapi.json` ou `schema.d.ts` à mão: rodar `just gen-client` após qualquer mudança de rota/schema no backend.
+- Componentes chamam `$api.useQuery(...)` / `$api.useMutation(...)` **diretamente** (ex.: `HealthStatus` usa `$api.useQuery("get", "/api/v1/health")`). Extraia um hook em `src/features/<feature>/use*.ts` só quando houver lógica além da chamada ou reuso (ex.: `useLogin`/`useLogout`, que invalidam a query `me` e redirecionam).
+- Nunca editar `schema.d.ts` à mão: rodar `just gen-client` após qualquer mudança de rota/schema no backend.
 
 ### 8.3 UI
 
@@ -581,7 +582,8 @@ Executado com `uvx pre-commit` (instalado nos hooks por `just setup`). Apenas ho
 - `ruff-pre-commit`: `ruff check --fix` e `ruff format` em `backend/`.
 - Hook local: ESLint e Prettier nos arquivos staged de `frontend/` (via `pnpm --dir frontend exec ...`).
 - `gitleaks`: detecção de segredos.
-- Hook `commit-msg`: validação de Conventional Commits (ex.: `conventional-pre-commit`).
+
+Sem hook `commit-msg`: com squash merge, só o título do PR chega à `main` (seção 4.3).
 
 mypy, tsc e testes rodam **somente no CI** (e localmente via `just`), para não tornar o commit lento.
 
@@ -595,8 +597,8 @@ mypy, tsc e testes rodam **somente no CI** (e localmente via `just`), para não 
 
 | Tipo | Pasta | Marker | O que cobre | Banco | Externos |
 |---|---|---|---|---|---|
-| Unitário | `tests/unit/` | `unit` | Regras de domínio e casos de uso com repositórios/ports fake | Não | Fakes |
-| Integração | `tests/integration/` | `integration` | Repositórios SQL, migrações (upgrade head), constraints | Postgres real | — |
+| Unitário | `tests/unit/` | `unit` | Regras puras de domínio, com fakes de ports (`Clock`) | Não | Fakes |
+| Integração | `tests/integration/` | `integration` | Migrações (upgrade/downgrade), constraints e, quando existirem, repositórios SQL | Postgres real | — |
 | API (e2e de endpoint) | `tests/api/` | `api` | App completo via `httpx.AsyncClient(transport=ASGITransport(app))`: status codes, cookies, auth, CSRF, contrato | Postgres real | Fakes via `dependency_overrides` |
 
 **Infraestrutura de banco nos testes**:
@@ -613,7 +615,7 @@ mypy, tsc e testes rodam **somente no CI** (e localmente via `just`), para não 
 **Testes mínimos da E0**:
 
 - unit: regra de expiração/renovação de sessão (função pura de `domain/auth.py`) com `FakeClock`.
-- integration: `SqlSessionRepository` cria/busca/apaga; migração aplica e reverte (`downgrade base`) sem erro.
+- integration: migração aplica e reverte (`downgrade base`) sem erro; `uq_users_email` rejeita e-mail duplicado.
 - api: `GET /health` 200; login com senha correta → cookie → `GET /auth/me` 200; senha incorreta e usuário inexistente → mesma resposta genérica; logout → `/auth/me` 401; `POST` sem `Origin` válido → 403; rate limit do login.
 
 **Factories de dados**: adiadas até existirem entidades de domínio (E1+).
@@ -726,7 +728,6 @@ stage runtime: caddy:2.<x>-alpine
 }
 ```
 
-`just prod-local` usa o mesmo Caddyfile com `APP_DOMAIN=localhost` (Caddy emite certificado interno).
 
 ### 11.3 `compose.yaml` (desenvolvimento)
 
@@ -767,7 +768,7 @@ Volumes nomeados: `db_data`, `caddy_data`, `caddy_config`. Secrets: `postgres_pa
 1. Criar o VPS com Ubuntu 24.04 LTS (sem painel), cadastrando a chave SSH pessoal.
 2. Hardening: usuário administrativo com sudo, `PasswordAuthentication no`, `PermitRootLogin no`; `ufw` (ou firewall do provedor) liberando 22, 80, 443/tcp e 443/udp; `unattended-upgrades` ativo.
 3. Instalar Docker Engine + plugin Compose (repositório oficial da Docker).
-4. Criar usuário `deploy` (grupo `docker`), com a chave pública de deploy em `authorized_keys` **restrita por `command=`** a `/opt/vocab/deploy/deploy.sh` (com `no-port-forwarding,no-agent-forwarding,no-pty`). O `deploy.sh` lê o SHA de `SSH_ORIGINAL_COMMAND` e o valida (`^[0-9a-f]{40}$`).
+4. Criar usuário `deploy` (grupo `docker`, **sem sudo**), com a chave pública de deploy em `authorized_keys` (opções `no-port-forwarding,no-agent-forwarding,no-X11-forwarding`). Não usar `command=`: o CI copia `deploy/` a cada deploy (o que um comando forçado bloquearia) e o grupo `docker` já equivale a root no host, então a restrição não protegeria nada. A proteção está no acesso à chave (seção 12.2). O `deploy.sh` valida o SHA recebido (`^[0-9a-f]{40}$`).
 5. Criar `/opt/vocab/.env` e `/opt/vocab/deploy/secrets/postgres_password` (senha forte, `chmod 600`, dono `deploy`).
 6. DNS no Registro.br: registro `A` `vocab` → IP do VPS (e `AAAA` se houver IPv6).
 7. Primeiro deploy via GitHub Actions; criar o usuário com `create-user`.
@@ -813,8 +814,8 @@ Gatilhos: `push` na `main` e `workflow_dispatch` (input `sha`, para reimplantar 
 1. **build-and-push** (`needs: ci`; pulado no `workflow_dispatch`, que reutiliza imagens já publicadas) (`permissions: contents: read, packages: write`): `docker/setup-buildx-action` → `docker/login-action` (GHCR, `GITHUB_TOKEN`) → `docker/build-push-action` para `vocab-api:<sha>` e `vocab-web:<sha>`, `platforms: linux/amd64`, cache `type=gha`.
 2. **deploy**:
    - Configura a chave SSH e o `known_hosts` (do Environment; nunca `StrictHostKeyChecking=no`).
-   - Copia `deploy/` para `/opt/vocab/deploy/` (sem `secrets/`, que existe só no VPS).
-   - Executa via SSH o `deploy.sh <sha>` (comando forçado), enviando o `GITHUB_TOKEN` efêmero pelo stdin para `docker login ghcr.io`.
+   - Copia `deploy/` para `/opt/vocab/deploy/` com `rsync` (sem `secrets/`, que existe só no VPS).
+   - Executa via SSH `/opt/vocab/deploy/deploy.sh <sha>`, enviando o `GITHUB_TOKEN` efêmero pelo stdin para `docker login ghcr.io`.
 3. **`deploy.sh <sha>`** (no VPS):
    1. Valida o SHA; `docker login ghcr.io --password-stdin`.
    2. `IMAGE_TAG=<sha> docker compose -f compose.prod.yaml pull`.
@@ -824,6 +825,8 @@ Gatilhos: `push` na `main` e `workflow_dispatch` (input `sha`, para reimplantar 
    6. Falha → sai com erro (job vermelho) e **não** grava `current_tag`. Não há rollback automático: projeto single-user, alguns minutos fora do ar são aceitáveis.
 
 **Secrets do Environment `production`**: `DEPLOY_HOST`, `DEPLOY_USER` (`deploy`), `DEPLOY_SSH_KEY` (chave privada exclusiva do deploy), `DEPLOY_KNOWN_HOSTS`. Variável: `APP_DOMAIN`.
+
+**Proteção da chave de deploy**: o usuário `deploy` está no grupo `docker` e recebe o compose do CI, então a chave vazada equivale a acesso root ao VPS. Por isso o Environment `production` tem *deployment branch rule* restrita à `main` (workflows de PRs e outras branches não acessam a chave), a chave é exclusiva do deploy e revogável a qualquer momento removendo-a do `authorized_keys`.
 
 **Rollback manual**: `just deploy-rollback <sha>` dispara o `deploy.yml` (`workflow_dispatch` com input `sha`), que pula CI e build e executa `deploy.sh <sha>` com uma tag já publicada (ex.: a anterior, visível no histórico de deploys do GitHub). Se a versão com falha aplicou uma migração incompatível, rodar antes o downgrade **com a imagem da versão com falha**, que é a que conhece a migração nova (`IMAGE_TAG=<sha com falha> docker compose -f compose.prod.yaml run --rm migrate alembic downgrade <revisão>`). Rollback automático pode ser reavaliado quando houver dados ou uso que justifiquem.
 
@@ -843,7 +846,7 @@ Todos via `just` (instalação: `uv tool install rust-just`). `just --list` most
 
 | Receita | O que faz |
 |---|---|
-| `just setup` | Instala deps do backend (`uv sync`) e do frontend (`pnpm install`), instala os hooks (`uvx pre-commit install --install-hooks -t pre-commit -t commit-msg`) e copia `.env.example` → `.env` se não existir. |
+| `just setup` | Instala deps do backend (`uv sync`) e do frontend (`pnpm install`), instala os hooks (`uvx pre-commit install --install-hooks`) e copia `.env.example` → `.env` se não existir. |
 | `just db-up` / `just db-down` | Sobe/derruba o Postgres do `compose.yaml`. |
 | `just dev` | `db-up` + backend (`uvicorn --reload` na 8000) + frontend (`pnpm dev` na 5173) em paralelo. |
 | `just dev-backend` / `just dev-frontend` | Apenas backend / apenas frontend. |
@@ -857,9 +860,8 @@ Todos via `just` (instalação: `uv tool install rust-just`). `just --list` most
 | `just test-unit` / `just test-integration` / `just test-api` | Testes do backend por marker. |
 | `just test-backend` | `pytest` com todos os markers + cobertura (usado no CI). |
 | `just test-frontend` | Vitest (run). |
-| `just gen-client` | `uv run python -m app.scripts.export_openapi > frontend/src/api/openapi.json` + `openapi-typescript` → `schema.d.ts`. |
+| `just gen-client` | Exporta o OpenAPI (`uv run python -m app.scripts.export_openapi`) para um arquivo temporário e gera `frontend/src/api/schema.d.ts` com `openapi-typescript`. O JSON intermediário não é versionado. |
 | `just build` | `build-frontend` (Vite) + build local das imagens Docker. |
-| `just prod-local` | Sobe `deploy/compose.prod.yaml` localmente com imagens locais e `APP_DOMAIN=localhost` (smoke test pré-deploy). |
 | `just deploy-rollback <sha>` | Rollback manual: dispara o `deploy.yml` para reimplantar uma tag já publicada (`gh workflow run deploy.yml -f sha=<sha>`). |
 
 ---

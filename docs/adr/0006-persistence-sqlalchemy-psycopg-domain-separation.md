@@ -11,10 +11,11 @@ O domínio é rico (Term, Card, ReviewLog, LearnerProfile...), usa JSONB e terá
 
 - **SQLAlchemy 2.0 async** com modelos tipados (`Mapped[...]`) em `app/adapters/db/models/`; Alembic para migrações.
 - **psycopg 3** como driver único (async na aplicação, sync no Alembic, na CLI e em fixtures).
-- **Separação com bom senso**: agregados com regra de negócio têm entidade de domínio (dataclass em `app/domain/`) e repositório (port em `app/ports/`, implementação em `app/adapters/db/repositories/`). Leituras simples (listagens, filtros) podem consultar o ORM diretamente na camada `application/` e devolver DTOs.
+- **Separação com bom senso**: agregados com regra de negócio têm entidade de domínio (dataclass em `app/domain/`) e repositório (port em `app/ports/`, implementação em `app/adapters/db/repositories/`). CRUD e leituras simples (listagens, filtros) usam a `AsyncSession` e o ORM diretamente na camada `application/` e devolvem DTOs.
+- **Na E0 não há repositórios**: `users` e `sessions` são CRUD sem regra; a expiração da sessão é uma função pura em `domain/`. O primeiro repositório nasce com o primeiro agregado com regra (ex.: `Card`/FSRS na E3).
 
 ## Consequências
 
 - Domínio testável sem banco; ORM com suporte completo a JSONB, constraints e consultas complexas.
-- Custo de mapeamento ORM ↔ domínio nos agregados com regra.
+- Custo de mapeamento ORM ↔ domínio apenas nos agregados com regra; o resto não paga essa cerimônia.
 - Agentes não devem expor modelos ORM na camada `api/` nem colocar regra de negócio em routers.
