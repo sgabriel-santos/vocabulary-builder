@@ -69,13 +69,13 @@ just --list                # todas as receitas
 - **Nomenclatura**: Python `snake_case` (módulos, funções) e `PascalCase` (classes); TS componentes `PascalCase.tsx`, hooks `useX.ts`, demais `kebab-case.ts`; tabelas plural `snake_case`; JSON da API em `snake_case` (sem alias camelCase); endpoints sob `/api/v1`; testes `test_*.py` e `*.test.ts(x)`. Detalhes: seção 4 da especificação.
 - **Funcionalidades** são referenciadas pelos códigos `F-xx` em planos, branches, PRs e commits.
 - **Git**: branch curta (`feat/F-01-...`, `fix/...`, `chore/...`, `docs/...`) → PR → squash merge na `main`. Nunca push direto na `main`. Commits seguem o `CLAUDE.md` (Conventional Commits em inglês, sem atribuição de IA, aprovação explícita do usuário antes de cada commit).
-- **Banco**: toda mudança de schema por migração Alembic revisada à mão; migrações **compatíveis com a versão anterior** (expand/contract), pois o rollback automático do deploy não reverte schema. Timestamps em UTC.
+- **Banco**: toda mudança de schema por migração Alembic revisada à mão; **prefira** migrações compatíveis com a versão anterior (diretriz, não regra: o rollback é manual e não reverte schema; ver spec §4.4). Timestamps em UTC.
 - **ADRs**: decisões arquiteturais novas viram `docs/adr/NNNN-titulo.md`.
 
 ## Faça
 
 - Coloque regras de negócio em `domain/`/`application/`, nunca em routers.
-- Acesse provedores externos **somente via port** e crie o fake correspondente em `backend/tests/fakes/`.
+- Acesse provedores externos **somente via port** e crie o fake correspondente em `backend/tests/fakes/`. Repositórios não precisam de fake em memória (os testes usam Postgres real).
 - Use o port `Clock` para qualquer lógica dependente de tempo.
 - Escreva testes no nível certo: `unit` (sem banco), `integration` (repositórios/migrações), `api` (endpoints com fakes de provedores).
 - Valide toda saída de LLM com Pydantic; prompts versionados em arquivos dedicados (a partir da E2).
@@ -102,7 +102,7 @@ just --list                # todas as receitas
 | Decisão | Motivo | ADR |
 |---|---|---|
 | VPS + Docker Compose + Caddy; frontend e API na mesma origem | Custo fixo baixo, sem cold start, sem CORS | [0001](docs/adr/0001-hosting-vps-compose-caddy.md) |
-| Postgres em container no VPS + backup criptografado externo | Latência mínima; backup diário cobre o risco | [0002](docs/adr/0002-postgres-on-vps-with-offsite-backup.md) |
+| Postgres em container no VPS + backup criptografado externo (a partir da E1) | Latência mínima; backup diário cobre o risco | [0002](docs/adr/0002-postgres-on-vps-with-offsite-backup.md) |
 | Senha (Argon2) + sessão server-side em cookie; sem JWT | Revogação imediata, imune a roubo por XSS, funciona na PWA do iOS | [0003](docs/adr/0003-auth-password-server-side-sessions.md) |
 | uv + Python 3.14 | Velocidade e reprodutibilidade; 3.15 bloqueado pelo spaCy | [0004](docs/adr/0004-python-tooling-uv-python-314.md) |
 | pnpm + Node 26 LTS | Instalação rápida e estrita | [0005](docs/adr/0005-frontend-tooling-pnpm-node-26.md) |
@@ -111,7 +111,7 @@ just --list                # todas as receitas
 | TanStack Router com rotas por arquivo | Rotas e search params tipados | [0008](docs/adr/0008-frontend-routing-tanstack-router.md) |
 | Client OpenAPI gerado (só tipos) e versionado, com checagem de drift | Contrato quebra na compilação, não em produção | [0009](docs/adr/0009-api-client-openapi-fetch-versioned.md) |
 | Imagens `api` e `web`; compose dev/prod separados; migração one-off | Uma imagem para API/migrate/CLI/worker; deploy seguro | [0010](docs/adr/0010-docker-images-and-compose-layout.md) |
-| Deploy automático na `main` com rollback automático | `main` = produção, recuperação sozinha | [0011](docs/adr/0011-ci-cd-auto-deploy-with-rollback.md) |
+| Deploy automático na `main` com smoke test; rollback manual | `main` = produção; sem o custo de expand/contract obrigatório | [0011](docs/adr/0011-ci-cd-auto-deploy-with-rollback.md) |
 | PR + squash merge; `main` protegida | `main` sempre verde; PR como ponto de revisão | [0012](docs/adr/0012-branching-pr-squash-merge.md) |
 
 Se uma dessas decisões parecer inadequada para uma tarefa, **pare e consulte o usuário** em vez de contorná-la.

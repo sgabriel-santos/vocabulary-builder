@@ -14,7 +14,7 @@ Decisões arquiteturais do Vocabulary Builder. Formato curto: Status, Data, Cont
 | [0008](0008-frontend-routing-tanstack-router.md) | Roteamento do frontend com TanStack Router | Aceita |
 | [0009](0009-api-client-openapi-fetch-versioned.md) | Client da API gerado com openapi-typescript e openapi-fetch | Aceita |
 | [0010](0010-docker-images-and-compose-layout.md) | Imagens Docker e organização do Compose | Aceita |
-| [0011](0011-ci-cd-auto-deploy-with-rollback.md) | CI/CD com GitHub Actions, deploy automático e rollback | Aceita |
+| [0011](0011-ci-cd-auto-deploy-with-rollback.md) | CI/CD com GitHub Actions, deploy automático e rollback manual | Aceita |
 | [0012](0012-branching-pr-squash-merge.md) | Branching com PR e squash merge | Aceita |
 
 ## Template

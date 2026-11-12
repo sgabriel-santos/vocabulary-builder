@@ -1003,11 +1003,11 @@ Limiares configuráveis e a calibrar com uso real.
 > As Fases 0 e 1 estão detalhadas em entregas incrementais (E0–E5) em [`docs/delivery-plan.md`](delivery-plan.md). Decisão: o deploy em produção acontece desde a E0 (não mais apenas na Fase 5).
 
 ### Fase 0 — Fundação
-- Monorepo, docker-compose (Postgres, MinIO, Redis se necessário), CI com lint e testes.
+- Monorepo, docker-compose de dev só com Postgres, CI com lint, tipos e testes, deploy automático em produção (detalhes na E0 do [`delivery-plan.md`](delivery-plan.md) e na [especificação do scaffolding](scaffolding-specification.md)).
 - Backend FastAPI com estrutura de camadas, config, logging, migrações.
 - Frontend Vite + React + TS, client gerado do OpenAPI, roteamento, layout base, PWA básica.
 - Autenticação simples.
-- Ports e fakes de todos os provedores externos.
+- MinIO, Redis/fila e os ports e fakes de provedores externos **não** entram aqui: cada um chega na entrega que o usa (E2, E4...).
 
 ### Fase 1 — MVP (ciclo principal funcionando)
 - F-01 captura individual e em lote (sem extensão).

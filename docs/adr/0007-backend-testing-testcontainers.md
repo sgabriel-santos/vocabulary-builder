@@ -9,7 +9,7 @@ Os requisitos exigem testes unitários do domínio (com relógio injetável), te
 
 ## Decisão
 
-- Pastas: `tests/unit` (sem banco, com fakes), `tests/integration` (repositórios e migrações em Postgres real), `tests/api` (app completo via `httpx.AsyncClient` + `ASGITransport`, banco real, provedores fake via `dependency_overrides`), `tests/fakes` (um fake por port). Markers `unit`, `integration`, `api`.
+- Pastas: `tests/unit` (sem banco, com fakes), `tests/integration` (repositórios e migrações em Postgres real), `tests/api` (app completo via `httpx.AsyncClient` + `ASGITransport`, banco real, provedores fake via `dependency_overrides`), `tests/fakes` (fakes dos ports de provedores e infraestrutura, como `Clock` e `PasswordHasher`). Repositórios **não** ganham fake em memória por padrão: os testes de integração e de API já usam Postgres real, e a regra de negócio fica em código puro de `domain/`. Um fake de repositório só é criado quando um teste unitário realmente precisar dele. Markers `unit`, `integration`, `api`.
 - Port `Clock` desde a E0.
 - Postgres via **testcontainers** (`postgres:18-alpine`, mesma imagem da produção), `alembic upgrade head` uma vez por sessão e rollback por teste (savepoint, `join_transaction_mode="create_savepoint"`).
 - pytest + pytest-asyncio (modo auto) + pytest-cov sem gate de cobertura na E0.

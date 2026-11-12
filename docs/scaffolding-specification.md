@@ -4,7 +4,7 @@
 >
 > **Origem:** decisões tomadas no brainstorm de scaffolding (skill `scaffolding-brainstorm`), registradas como ADRs em [`docs/adr/`](adr/README.md).
 >
-> **Status:** aprovado · **Data:** 2026-11-12
+> **Status:** aprovado · **Data:** 2026-11-12 · **Revisão:** E0 enxugada (backup movido para a E1, rollback manual, sem fakes em memória de repositórios, deploy em workflow único, Dependabot mensal)
 >
 > **Fora deste documento:** cronograma, tarefas e ordem de implementação (ficam no Blueprint gerado pela skill `scaffolding-blueprint`).
 
@@ -43,17 +43,17 @@ A E0 **não entrega nenhuma funcionalidade `F-xx`**. Ela entrega o caminho compl
 - Frontend com roteamento, layout base, PWA instalável, client gerado do OpenAPI, tela de login e tela protegida que exibe o status do backend.
 - Ferramentas de qualidade e um teste de exemplo em cada camada de teste.
 - `compose.yaml` local apenas com Postgres.
-- CI (lint, tipos, testes, drift do contrato) e CD (deploy automático na `main` com rollback).
-- Produção com HTTPS em VPS, Postgres com backup externo e segredos fora do repositório.
+- CI (lint, tipos, testes, drift do contrato) e CD (deploy automático na `main` com smoke test; rollback manual).
+- Produção com HTTPS em VPS e segredos fora do repositório.
 
-**Fora do escopo da E0:** qualquer `F-xx`, fila/worker, Redis, object storage, ports de provedores de IA (entram nas entregas que os usam), Playwright.
+**Fora do escopo da E0:** qualquer `F-xx`, fila/worker, Redis, object storage, ports de provedores de IA (entram nas entregas que os usam), Playwright, **backup externo** (entra na E1, antes de existirem dados reais; seção 11.7) e **rollback automático** (seção 12.2).
 
 ### 1.3 Decisões centrais
 
 | Tema | Decisão | ADR |
 |---|---|---|
 | Hospedagem | VPS Hostinger KVM 2 (BR) + Docker Compose + Caddy (HTTPS automático, mesma origem) | [0001](adr/0001-hosting-vps-compose-caddy.md) |
-| Banco | Postgres 18 em container no VPS + backup diário criptografado externo | [0002](adr/0002-postgres-on-vps-with-offsite-backup.md) |
+| Banco | Postgres 18 em container no VPS + backup diário criptografado externo (a partir da E1) | [0002](adr/0002-postgres-on-vps-with-offsite-backup.md) |
 | Autenticação | E-mail + senha (Argon2) + sessão server-side em cookie `HttpOnly` | [0003](adr/0003-auth-password-server-side-sessions.md) |
 | Python | `uv` + Python 3.14 | [0004](adr/0004-python-tooling-uv-python-314.md) |
 | Node | pnpm + Node 26 LTS | [0005](adr/0005-frontend-tooling-pnpm-node-26.md) |
@@ -62,7 +62,7 @@ A E0 **não entrega nenhuma funcionalidade `F-xx`**. Ela entrega o caminho compl
 | Roteamento | TanStack Router com rotas por arquivo | [0008](adr/0008-frontend-routing-tanstack-router.md) |
 | Client da API | openapi-typescript + openapi-fetch + openapi-react-query; versionado com checagem de drift | [0009](adr/0009-api-client-openapi-fetch-versioned.md) |
 | Docker | Imagens `api` e `web`; compose de dev e de prod separados; migração one-off | [0010](adr/0010-docker-images-and-compose-layout.md) |
-| CI/CD | GitHub Actions; deploy automático na `main` com rollback automático | [0011](adr/0011-ci-cd-auto-deploy-with-rollback.md) |
+| CI/CD | GitHub Actions; deploy automático na `main` com smoke test; rollback manual | [0011](adr/0011-ci-cd-auto-deploy-with-rollback.md) |
 | Branching | Branches curtas + PR + squash merge | [0012](adr/0012-branching-pr-squash-merge.md) |
 
 Padrões de baixo impacto (task runner, hooks, logging, type checker, UI, lint, PWA, nomenclatura etc.) estão nas seções correspondentes deste documento.
@@ -85,7 +85,7 @@ Padrões de baixo impacto (task runner, hooks, logging, type checker, UI, lint, 
 │  │ api (FastAPI / uvicorn)      │──▶│ db (postgres:18)   │◀──│ migrate       │  │
 │  └──────────────────────────────┘   │ volume db_data     │   │ (one-off)     │  │
 │                                     └─────────┬──────────┘   └───────────────┘  │
-│  systemd timer → deploy/backup.sh ────────────┘ pg_dump → age → rclone          │
+│  systemd timer → deploy/backup.sh (E1) ───────┘ pg_dump → age → rclone          │
 └──────────────────────────────────────────────────┼──────────────────────────────┘
                                                    ▼
                                     Storage externo (Backblaze B2 ou Cloudflare R2)
@@ -108,16 +108,16 @@ vocabulary-builder/
 ├── .gitignore
 ├── .pre-commit-config.yaml          # Hooks rápidos (seção 9.2)
 ├── .github/
-│   ├── dependabot.yml               # Atualizações semanais agrupadas
+│   ├── dependabot.yml               # Atualizações mensais agrupadas
 │   └── workflows/
-│       ├── ci.yml                   # Lint, tipos, testes, drift do contrato, gitleaks
-│       └── deploy.yml               # Build/push GHCR + deploy SSH + smoke test + rollback
+│       ├── ci.yml                   # Lint, tipos, testes, drift do contrato, gitleaks (reutilizável via workflow_call)
+│       └── deploy.yml               # Push na main: chama ci.yml → build/push GHCR → deploy SSH + smoke test
 ├── deploy/                          # Tudo que vive no VPS (copiado a cada deploy, exceto segredos)
 │   ├── README.md                    # Setup inicial do VPS, DNS, backup e restore (runbook)
 │   ├── compose.prod.yaml            # Compose de PRODUÇÃO: web, api, migrate, db
-│   ├── deploy.sh                    # Executado via SSH: pull, up -d, smoke test, rollback
-│   ├── backup.sh                    # pg_dump → age → rclone → ping de monitoramento
-│   ├── systemd/
+│   ├── deploy.sh                    # Executado via SSH: pull, up -d, smoke test
+│   ├── backup.sh                    # (E1) pg_dump → age → rclone → ping de monitoramento
+│   ├── systemd/                     # (E1)
 │   │   ├── vocab-backup.service     # Unidade que executa backup.sh
 │   │   └── vocab-backup.timer       # Agenda diária
 │   └── secrets/
@@ -178,7 +178,7 @@ vocabulary-builder/
 │   │       └── export_openapi.py    # Exporta app.openapi() para JSON sem subir servidor
 │   └── tests/
 │       ├── conftest.py              # Fixtures globais (settings de teste, clock fake)
-│       ├── fakes/                   # Um fake por port: FakeClock, FakePasswordHasher, InMemory*Repository
+│       ├── fakes/                   # Fakes de ports de provedores/infra: FakeClock, FakePasswordHasher
 │       ├── unit/                    # Domínio e casos de uso com fakes (sem DB)
 │       ├── integration/             # Repositórios e migrações contra Postgres real (testcontainers)
 │       │   └── conftest.py          # Container Postgres, alembic upgrade head, sessão com rollback
@@ -313,7 +313,7 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 | VPS | Hostinger KVM 2 (2 vCPU / 8 GB / 100 GB NVMe), data center Brasil, x86_64 | Ubuntu 24.04 LTS sem painel. |
 | Domínio / DNS | Registro.br, DNS do Registro.br | Registro `A` `vocab` → IP do VPS (e `AAAA` se houver IPv6). |
 | Registry | GHCR (`ghcr.io/sgabriel-santos/vocab-api`, `.../vocab-web`) | Tags = SHA do commit. |
-| Backup externo | Backblaze B2 ou Cloudflare R2 | Camada gratuita basta. |
+| Backup externo (E1) | Backblaze B2 ou Cloudflare R2 | Camada gratuita basta. |
 | Monitoramento (opcional) | UptimeRobot (uptime de `/api/v1/health`) e Healthchecks.io (ping do backup) | Gratuitos. |
 
 ---
@@ -335,7 +335,7 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 | Funções/variáveis Python | `snake_case` | `resolve_session()` |
 | Ports | substantivo do papel, sem prefixo `I` | `Clock`, `UserRepository` |
 | Adapters | tecnologia + papel | `Argon2PasswordHasher`, `SqlUserRepository` |
-| Fakes | `Fake` / `InMemory` + papel | `FakeClock`, `InMemorySessionRepository` |
+| Fakes | `Fake` / `InMemory` + papel | `FakeClock`, `FakePasswordHasher` |
 | Tabelas | plural `snake_case` | `users`, `sessions` |
 | Colunas | `snake_case`; FKs `<entidade>_id`; timestamps `*_at` (UTC, `timestamptz`) | `user_id`, `expires_at` |
 | IDs | UUID (v4 ou v7) gerado na aplicação | — |
@@ -360,7 +360,7 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 ### 4.4 Banco e migrações
 
 - Toda mudança de schema via Alembic (`just migration "mensagem"`), revisada manualmente após o autogenerate.
-- **Migrações compatíveis com a versão anterior da aplicação (expand/contract)**: o rollback automático do deploy (seção 12.2) volta o código, não o schema. Remoções/renomeações de colunas são feitas em duas entregas (expandir → migrar código → contrair).
+- **Diretriz (não regra): preferir migrações compatíveis com a versão anterior da aplicação.** O rollback (manual, seção 12.2) volta o código, não o schema. Para mudanças destrutivas (remover/renomear coluna), avaliar caso a caso: em um app single-user, alguns minutos fora do ar são aceitáveis; se o rollback for necessário depois de uma migração destrutiva, faça `alembic downgrade` antes de reimplantar a tag anterior.
 - Timestamps em UTC (`timestamptz`).
 
 ### 4.5 ADRs
@@ -515,8 +515,10 @@ O `Settings` lê `postgres_password` de `/run/secrets` (campo `postgres_password
 |---|---|---|
 | `Clock` | `SystemClock` (UTC) | `FakeClock` (tempo controlável) |
 | `PasswordHasher` | `Argon2PasswordHasher` | `FakePasswordHasher` (rápido, determinístico) |
-| `UserRepository` | `SqlUserRepository` | `InMemoryUserRepository` |
-| `SessionRepository` | `SqlSessionRepository` | `InMemorySessionRepository` |
+| `UserRepository` | `SqlUserRepository` | — |
+| `SessionRepository` | `SqlSessionRepository` | — |
+
+**Repositórios não ganham fake em memória por padrão.** Os testes de integração e de API já usam Postgres real (testcontainers), então um `InMemory*Repository` só duplicaria o repositório SQL e precisaria ser mantido em paralelo. A regra de negócio fica em funções/entidades puras de `domain/` (testadas em `unit/`), e os casos de uso que dependem de repositório são cobertos pelos testes de `api/`. Crie um fake de repositório apenas se surgir um teste unitário que realmente precise dele.
 
 Os ports de provedores externos do overview §8.2 (`LLMProvider`, `TTSProvider` etc.) entram nas entregas que os usam.
 
@@ -610,9 +612,9 @@ mypy, tsc e testes rodam **somente no CI** (e localmente via `just`), para não 
 
 **Testes mínimos da E0**:
 
-- unit: expiração/renovação de sessão com `FakeClock`; caso de uso de login com fakes (senha correta, incorreta, usuário inexistente).
+- unit: regra de expiração/renovação de sessão (função pura de `domain/auth.py`) com `FakeClock`.
 - integration: `SqlSessionRepository` cria/busca/apaga; migração aplica e reverte (`downgrade base`) sem erro.
-- api: `GET /health` 200; login → cookie → `GET /auth/me` 200; logout → `/auth/me` 401; `POST` sem `Origin` válido → 403; rate limit do login.
+- api: `GET /health` 200; login com senha correta → cookie → `GET /auth/me` 200; senha incorreta e usuário inexistente → mesma resposta genérica; logout → `/auth/me` 401; `POST` sem `Origin` válido → 403; rate limit do login.
 
 **Factories de dados**: adiadas até existirem entidades de domínio (E1+).
 
@@ -751,13 +753,12 @@ Volumes nomeados: `db_data`, `caddy_data`, `caddy_config`. Secrets: `postgres_pa
 ```
 /opt/vocab/
 ├── .env                       # Configuração de produção (chmod 600, não versionado)
-├── current_tag                # SHA em produção (escrito pelo deploy.sh)
-├── previous_tag               # SHA anterior (usado no rollback)
+├── current_tag                # SHA em produção (escrito pelo deploy.sh; referência para rollback manual)
 └── deploy/                    # Copiado do repositório a cada deploy
     ├── compose.prod.yaml
     ├── deploy.sh
-    ├── backup.sh
-    ├── systemd/
+    ├── backup.sh              # (E1)
+    ├── systemd/               # (E1)
     └── secrets/postgres_password   # Criado manualmente no setup (chmod 600)
 ```
 
@@ -769,10 +770,12 @@ Volumes nomeados: `db_data`, `caddy_data`, `caddy_config`. Secrets: `postgres_pa
 4. Criar usuário `deploy` (grupo `docker`), com a chave pública de deploy em `authorized_keys` **restrita por `command=`** a `/opt/vocab/deploy/deploy.sh` (com `no-port-forwarding,no-agent-forwarding,no-pty`). O `deploy.sh` lê o SHA de `SSH_ORIGINAL_COMMAND` e o valida (`^[0-9a-f]{40}$`).
 5. Criar `/opt/vocab/.env` e `/opt/vocab/deploy/secrets/postgres_password` (senha forte, `chmod 600`, dono `deploy`).
 6. DNS no Registro.br: registro `A` `vocab` → IP do VPS (e `AAAA` se houver IPv6).
-7. Configurar o backup (11.7) e testar um restore.
-8. Primeiro deploy via GitHub Actions; criar o usuário com `create-user`.
+7. Primeiro deploy via GitHub Actions; criar o usuário com `create-user`.
+8. **Na E1:** configurar o backup (11.7) e testar um restore.
 
-### 11.7 Backup e restore
+### 11.7 Backup e restore (entra na E1)
+
+> Não faz parte da E0: até a E1 o banco contém apenas o usuário criado pela CLI, recriável em segundos. O backup é **critério de pronto da E1** e precisa estar funcionando antes de importar a lista real de termos. O desenho abaixo já está decidido (ADR 0002).
 
 - `deploy/backup.sh`, executado diariamente por `vocab-backup.timer` (systemd, no host):
   1. `docker compose -f compose.prod.yaml exec -T db pg_dump -U <user> -Fc <db>`
@@ -789,7 +792,9 @@ Volumes nomeados: `db_data`, `caddy_data`, `caddy_config`. Secrets: `postgres_pa
 
 GitHub Actions. Actions com versão fixada (tag maior ou SHA), `permissions` mínimas por job. Os jobs chamam as receitas do `justfile`, então o CI executa o mesmo que o desenvolvedor executa localmente.
 
-### 12.1 `ci.yml`: em todo push e PR
+### 12.1 `ci.yml`: em todo PR e push fora da `main`
+
+Gatilhos: `pull_request`, `push` (exceto `main`) e `workflow_call` (para ser reutilizado pelo `deploy.yml`).
 
 | Job | Passos |
 |---|---|
@@ -800,30 +805,31 @@ GitHub Actions. Actions com versão fixada (tag maior ou SHA), `permissions` mí
 
 `just` é instalado no CI com `extractions/setup-just` (ou `uv tool install rust-just`). Os nomes exatos das receitas seguem a seção 13.
 
-### 12.2 `deploy.yml`: push na `main` com CI verde
+### 12.2 `deploy.yml`: push na `main`
 
-Gatilho: `workflow_run` do `ci.yml` concluído com sucesso na `main` (ou jobs encadeados com `needs`). `concurrency: { group: production, cancel-in-progress: false }`. `environment: production`.
+Gatilhos: `push` na `main` e `workflow_dispatch` (input `sha`, para reimplantar uma tag existente). Um único workflow com jobs encadeados por `needs` (sem `workflow_run`, que sempre executa a versão do workflow da `main` e é mais difícil de depurar). `concurrency: { group: production, cancel-in-progress: false }`. `environment: production` nos jobs de deploy.
 
-1. **build-and-push** (`permissions: contents: read, packages: write`): `docker/setup-buildx-action` → `docker/login-action` (GHCR, `GITHUB_TOKEN`) → `docker/build-push-action` para `vocab-api:<sha>` e `vocab-web:<sha>`, `platforms: linux/amd64`, cache `type=gha`.
+0. **ci**: `uses: ./.github/workflows/ci.yml` (mesmos jobs do PR). Pulado no `workflow_dispatch`.
+1. **build-and-push** (`needs: ci`; pulado no `workflow_dispatch`, que reutiliza imagens já publicadas) (`permissions: contents: read, packages: write`): `docker/setup-buildx-action` → `docker/login-action` (GHCR, `GITHUB_TOKEN`) → `docker/build-push-action` para `vocab-api:<sha>` e `vocab-web:<sha>`, `platforms: linux/amd64`, cache `type=gha`.
 2. **deploy**:
    - Configura a chave SSH e o `known_hosts` (do Environment; nunca `StrictHostKeyChecking=no`).
    - Copia `deploy/` para `/opt/vocab/deploy/` (sem `secrets/`, que existe só no VPS).
    - Executa via SSH o `deploy.sh <sha>` (comando forçado), enviando o `GITHUB_TOKEN` efêmero pelo stdin para `docker login ghcr.io`.
 3. **`deploy.sh <sha>`** (no VPS):
    1. Valida o SHA; `docker login ghcr.io --password-stdin`.
-   2. `previous_tag ← current_tag`; `IMAGE_TAG=<sha> docker compose -f compose.prod.yaml pull`.
+   2. `IMAGE_TAG=<sha> docker compose -f compose.prod.yaml pull`.
    3. `IMAGE_TAG=<sha> docker compose -f compose.prod.yaml up -d --remove-orphans` (o `migrate` roda antes da `api` pelo `depends_on`).
    4. Smoke test: `curl -fsS https://$APP_DOMAIN/api/v1/health` com até ~10 tentativas espaçadas.
-   5. Sucesso → grava `current_tag=<sha>`, `docker image prune` de imagens antigas (mantendo a anterior), `docker logout`.
-   6. Falha → **rollback automático**: `IMAGE_TAG=$previous_tag ... up -d`, novo smoke test, saída com erro (job vermelho). Migrações não são revertidas (por isso a regra expand/contract, seção 4.4).
+   5. Sucesso → grava `current_tag=<sha>`, `docker image prune` de imagens antigas (mantendo as duas mais recentes), `docker logout`.
+   6. Falha → sai com erro (job vermelho) e **não** grava `current_tag`. Não há rollback automático: projeto single-user, alguns minutos fora do ar são aceitáveis.
 
 **Secrets do Environment `production`**: `DEPLOY_HOST`, `DEPLOY_USER` (`deploy`), `DEPLOY_SSH_KEY` (chave privada exclusiva do deploy), `DEPLOY_KNOWN_HOSTS`. Variável: `APP_DOMAIN`.
 
-**Rollback manual**: `just deploy-rollback <sha>` dispara o workflow (`workflow_dispatch` com input `sha`) para reimplantar uma tag existente.
+**Rollback manual**: `just deploy-rollback <sha>` dispara o `deploy.yml` (`workflow_dispatch` com input `sha`), que pula CI e build e executa `deploy.sh <sha>` com uma tag já publicada (ex.: a anterior, visível no histórico de deploys do GitHub). Se a versão com falha aplicou uma migração incompatível, rodar antes o downgrade **com a imagem da versão com falha**, que é a que conhece a migração nova (`IMAGE_TAG=<sha com falha> docker compose -f compose.prod.yaml run --rm migrate alembic downgrade <revisão>`). Rollback automático pode ser reavaliado quando houver dados ou uso que justifiquem.
 
 ### 12.3 Dependabot (`.github/dependabot.yml`)
 
-Semanal, PRs agrupados por ecossistema: `github-actions` (raiz), `uv` (`/backend`), `npm` (`/frontend`, funciona com pnpm), `docker` (`/backend`, `/frontend`). PRs passam pelo CI como qualquer outro.
+**Mensal**, PRs agrupados por ecossistema (menos ruído em um projeto solo onde todo PR passa pelo CI): `github-actions` (raiz), `uv` (`/backend`), `npm` (`/frontend`, funciona com pnpm), `docker` (`/backend`, `/frontend`). PRs passam pelo CI como qualquer outro.
 
 ### 12.4 Proteção da `main` (configuração no GitHub)
 
@@ -854,7 +860,7 @@ Todos via `just` (instalação: `uv tool install rust-just`). `just --list` most
 | `just gen-client` | `uv run python -m app.scripts.export_openapi > frontend/src/api/openapi.json` + `openapi-typescript` → `schema.d.ts`. |
 | `just build` | `build-frontend` (Vite) + build local das imagens Docker. |
 | `just prod-local` | Sobe `deploy/compose.prod.yaml` localmente com imagens locais e `APP_DOMAIN=localhost` (smoke test pré-deploy). |
-| `just deploy-rollback <sha>` | Dispara o workflow de deploy para uma tag anterior (`gh workflow run`). |
+| `just deploy-rollback <sha>` | Rollback manual: dispara o `deploy.yml` para reimplantar uma tag já publicada (`gh workflow run deploy.yml -f sha=<sha>`). |
 
 ---
 
@@ -864,6 +870,5 @@ Todos via `just` (instalação: `uv tool install rust-just`). `just --list` most
 - `just lint`, `just typecheck` e `just test` passam localmente e no CI.
 - A URL pública `https://vocab.<domínio>` abre no celular com HTTPS válido; a PWA instala.
 - Login com o usuário criado via CLI funciona; a tela protegida exibe o status do backend; logout funciona.
-- Um merge na `main` publica automaticamente; um deploy com smoke test falhando volta sozinho para a versão anterior.
-- O backup diário chega ao storage externo e um restore de teste foi executado com sucesso.
+- Um merge na `main` publica automaticamente; um deploy com smoke test falhando deixa o job vermelho; `just deploy-rollback <sha>` reimplanta uma tag anterior.
 - Nenhum segredo no repositório (gitleaks verde); o `.env.example` documenta todas as variáveis.
