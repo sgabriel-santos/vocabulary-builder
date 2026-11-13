@@ -826,12 +826,12 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 | S2 | T-12 | Exportação do OpenAPI | ✅ | `489fc49` |
 | S2 | T-13 | Fixtures de teste | ✅ | commit final da S2 |
 | S2 | T-14 | Testes de integração e API | ✅ | commit final da S2 |
-| S3 | T-15 | Projeto frontend e ferramentas | ⬜ | |
-| S3 | T-16 | Client da API | ⬜ | |
-| S3 | T-17 | Router e rotas | ⬜ | |
-| S3 | T-18 | Telas e features | ⬜ | |
-| S3 | T-19 | PWA | ⬜ | |
-| S3 | T-20 | Testes de frontend | ⬜ | |
+| S3 | T-15 | Projeto frontend e ferramentas | ✅ | `f01ada0` |
+| S3 | T-16 | Client da API | ✅ | `2a3e88d` |
+| S3 | T-17 | Router e rotas | ✅ | `2a3e88d` |
+| S3 | T-18 | Telas e features | ✅ | `2a3e88d` |
+| S3 | T-19 | PWA | ✅ | `6fdfb67` |
+| S3 | T-20 | Testes de frontend | ✅ | commit final da S3 |
 | S4 | T-21 | Pre-commit | ⬜ | |
 | S4 | T-22 | CI | ⬜ | |
 | S4 | T-23 | Imagem api | ⬜ | |
@@ -882,3 +882,26 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 - **Versões e decisões práticas:** testcontainers 4.15: importar de `testcontainers.community.postgres` (o caminho `testcontainers.postgres` emite `DeprecationWarning`). SQLAlchemy 2.1: `Row` se desempacota direto (`session, user = row`); `row.tuple()`/`row._tuple()` estão depreciados. httpx: cookies por request (`cookies=...`) estão depreciados; usar `client.cookies.set(...)`. O marker de cada teste vem da pasta (`pytest_collection_modifyitems` no `tests/conftest.py`), então `pytest -m unit` roda sem Docker. Um container `postgres:18.7-alpine` por sessão de testes (~5 s).
 - **Em aberto:** o cookie de sessão tem `Max-Age` fixo de 60 dias a partir do login, enquanto o servidor renova `expires_at` (expiração deslizante). Um usuário ativo terá o cookie expirado no navegador após 60 dias mesmo com a sessão válida no banco. Decidir se o `current_user` deve reemitir o cookie quando a sessão é renovada.
 - **Próximo passo:** S3, começando pela T-15 (projeto Vite). Proxy do Vite para `http://localhost:${API_PORT}` (8001 no `.env` local) e `just gen-client` usando `uv run python -m app.scripts.export_openapi`.
+
+**S3 — 2026-11-13**
+- **Concluído:** T-15 a T-20. Marco verificado: login de ponta a ponta no navegador em `localhost:5173` (validado pelo usuário: redirect para `/login`, login, "API: ok · Banco: ok", e-mail no cabeçalho, "Sair"); o mesmo fluxo por `curl` pelo proxy do Vite (`Origin: http://localhost:5173` aceito pelo backend sem mudanças); `just lint`, `just typecheck` e `just test` verdes (backend: 33 testes, 81%; frontend: 13 testes, sem avisos); `just build-frontend` gera `sw.js` e `manifest.webmanifest` (precache de 29 entradas, nenhuma rota de runtime, `/api/` fora do fallback de navegação).
+- **Desvios do Blueprint:**
+  - **TypeScript fixado em `~6.0.3`** (decisão do usuário): o `create-vite` 9.3 já vem com TypeScript 7 (nativo) e oxlint, mas o `typescript-eslint` 8.72 aceita só `<6.1` e o `openapi-typescript` 7.13 declara `^5.x`. O oxlint foi removido para seguir a spec (ESLint flat). Revisitar quando o `typescript-eslint` suportar o TS 7.
+  - **Node 26 via `devEngines.runtime`** no `package.json` (`onFail: "download"`): o pnpm baixa o Node 26.13.1 para o `node_modules` e roda scripts/`exec` com ele, mesmo com o Node 24 como padrão do sistema. As receitas do `just` não usam nvm. O `.nvmrc` continua (CI e editor).
+  - **`libatomic1`** instalada no WSL: o binário do Node 26 depende dela e o Ubuntu 24.04 do WSL não a traz (o Node 26 da S1 nunca tinha chegado a rodar). Documentado no README.
+  - **Proxy do Vite lê `API_PORT`** do `.env` da raiz (`loadEnv`), em vez de fixar `localhost:8000`. `server.strictPort: true`.
+  - **shadcn 4.23** (`-b base -p nova` → estilo `base-nova`, Base UI): `cn()` vem do pacote oficial `cn` (substitui `clsx` + `tailwind-merge`); fonte Geist via `@fontsource-variable/geist`.
+  - **`ApiError(status, body)`**: o `openapi-react-query` lança só o corpo do erro, sem o status. Um middleware do `fetchClient` lança `ApiError` em toda resposta não-2xx; `isUnauthorized`, `LoginForm` e `HealthStatus` usam `error.status`. O redirect por 401 é um handler registrado pelo `router.ts` (`setUnauthorizedHandler`), evitando import circular `client.ts` ↔ `router.ts`.
+  - **`fetch: (request) => globalThis.fetch(request)`** no `createFetchClient`: o `openapi-fetch` captura o `fetch` na criação do client, antes do `server.listen()` do MSW. Sem isso, os testes iam para a rede de verdade (no caso, o `just dev` aberto) em vez dos handlers.
+  - **MSW 3**: a opção do `listen()` agora é `onUnhandledFrame: "error"` (era `onUnhandledRequest`). Respostas cujo corpo não está no OpenAPI (401/429 do FastAPI) usam `response.untyped(...)` no openapi-msw. `msw/node` fica em `src/test/server.ts`.
+  - **TanStack Query 5.107**: `ensureQueryData` está depreciado; o `_authenticated` usa `queryClient.query({ ...meQueryOptions(), staleTime: "static" })` (mesma semântica).
+  - **React 19.3**: `FormEvent` depreciado; o `LoginForm` usa `SubmitEvent`.
+  - **ESLint**: `react-refresh/only-export-components` desligada em `src/routes/` (arquivos de rota só exportam `Route`; o HMR deles é do plugin do router). `typescript-eslint` com `strictTypeChecked` + `stylisticTypeChecked`. `redirect` do TanStack Router lançado com `eslint-disable-next-line @typescript-eslint/only-throw-error`.
+  - **Prettier** com `printWidth: 100`.
+  - **`routeTree.gen.ts` versionado** (gerado pelo plugin no `vite dev`/`vite build`; o `tsc -b` precisa dele).
+  - **`isSafeRedirect`** (`features/auth/safe-redirect.ts`) recusa também `/\` além de `//`; ganhou teste próprio. O `login` e o `beforeLoad` usam `redirect({ href })`/`navigate({ href })`, já que o destino é um caminho livre.
+  - **PWA**: ícone próprio (`favicon.svg` com "V"; o do template era o logo do Vite); o gerador também cria `favicon.ico`; `globPatterns` inclui `ico` e `woff2` (fonte no precache).
+  - **Receitas novas**: `dev`, `dev-frontend`, `build-frontend`, `gen-client` (com `trap` para apagar o temporário), `lint-frontend`, `typecheck-frontend` (`tsc -b`), `test-frontend` e as agregadas `lint`, `typecheck`, `test`, `format`. `just setup` passou a rodar `pnpm install`. `just build` (com Docker) fica para a S4.
+- **Versões e decisões práticas:** create-vite 9.3.4; Vite 8.3; React 19.3; TypeScript 6.0.3; TanStack Router 1.170 (plugin 1.169), TanStack Query 5.107; openapi-fetch 0.17, openapi-react-query 0.5, openapi-typescript 7.13; Tailwind 4.3; shadcn 4.23; vite-plugin-pwa 2.0 (+ `workbox-window`), `@vite-pwa/assets-generator` 2.0; Vitest 5.1, jsdom 31, MSW 3.0, openapi-msw 2.1, Testing Library (React 16.3, jest-dom 7); ESLint 10.14, typescript-eslint 8.72, react-hooks 7.1, react-refresh 0.5; Prettier 3.10; `@types/node` 26. Vitest 5 esconde `console.log` de testes que passam (usar `--silent=false` para depurar).
+- **Em aberto:** a instalação da PWA no celular só é validável com HTTPS (S5). Continua em aberto o `Max-Age` fixo do cookie (S2). Os componentes de `src/components/ui/` usam `next-themes` (vindo do shadcn) sem `ThemeProvider`; o `useTheme` cai em `"system"`, que é o comportamento desejado por ora.
+- **Próximo passo:** S4, começando pela T-21 (pre-commit). No CI (T-22), o job `frontend` pode usar o Node do `setup-node` (`frontend/.nvmrc`); o `devEngines.runtime` faz o pnpm baixar a mesma versão se divergir. O `contract` roda `just gen-client` e `git diff --exit-code frontend/src/api/`.

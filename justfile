@@ -73,6 +73,10 @@ typecheck-frontend:
 test-backend:
     cd backend && uv run pytest --cov --cov-report=xml --cov-report=term
 
+# Testes do frontend (Vitest + Testing Library + MSW)
+test-frontend:
+    pnpm --dir frontend test
+
 # Testes unitários (sem Docker)
 test-unit:
     cd backend && uv run pytest -m unit
@@ -91,3 +95,17 @@ gen-client:
     trap 'rm -f "$tmp"' EXIT; \
     (cd backend && uv run python -m app.scripts.export_openapi) > "$tmp"; \
     pnpm --dir frontend exec openapi-typescript "$tmp" -o src/api/schema.d.ts
+
+# Lint de backend e frontend
+lint: lint-backend lint-frontend
+
+# Type check de backend e frontend
+typecheck: typecheck-backend typecheck-frontend
+
+# Todos os testes (backend precisa do Docker rodando)
+test: test-backend test-frontend
+
+# Formata backend (ruff) e frontend (prettier)
+format:
+    cd backend && uv run ruff format && uv run ruff check --fix
+    pnpm --dir frontend format

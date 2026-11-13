@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { fileURLToPath, URL } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
@@ -57,6 +58,13 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       // Mesma origem em dev: o navegador fala só com o Vite, que repassa /api.
       proxy: { "/api": `http://localhost:${apiPort}` },
+    },
+    test: {
+      environment: "jsdom",
+      // Fixa window.location.origin, usado como baseUrl do client da API.
+      environmentOptions: { jsdom: { url: "http://localhost:5173" } },
+      setupFiles: ["./src/test/setup.ts"],
+      globals: true,
     },
   };
 });

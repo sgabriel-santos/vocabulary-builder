@@ -47,6 +47,9 @@ const errorMiddleware: Middleware = {
 export const fetchClient = createFetchClient<paths>({
   baseUrl: window.location.origin, // mesma origem; absoluto para funcionar também no jsdom
   credentials: "same-origin",
+  // Resolve o fetch a cada chamada (e não na importação), para que o MSW,
+  // instalado depois nos testes, consiga interceptar as requisições.
+  fetch: (request) => globalThis.fetch(request),
 });
 fetchClient.use(errorMiddleware);
 
