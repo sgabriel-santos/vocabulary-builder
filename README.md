@@ -20,10 +20,19 @@ Backend em FastAPI (Python 3.14) + PostgreSQL 18; frontend em React + Vite (Node
 just setup        # cria o .env a partir do .env.example e instala as dependências do backend
 just db-up        # sobe o Postgres local (127.0.0.1:5432) e espera ficar saudável
 just migrate      # aplica as migrações
+just seed         # cria o usuário de desenvolvimento (dev@example.com / dev-password-123)
 just dev-backend  # API em http://localhost:8000 (docs em /api/docs)
 ```
 
 Verificação rápida: `curl localhost:8000/api/v1/health` → `{"status":"ok","database":"ok"}`.
+
+Login pela API (requests que alteram estado exigem o header `Origin`):
+
+```bash
+curl -i -c cookies.txt -H "Origin: http://localhost:8000" -H "Content-Type: application/json" \
+  -d '{"email":"dev@example.com","password":"dev-password-123"}' localhost:8000/api/v1/auth/login
+curl -b cookies.txt localhost:8000/api/v1/auth/me
+```
 
 > **Portas ocupadas?** Se outro projeto já usa a 5432 ou a 8000, ajuste `POSTGRES_PORT` e/ou `API_PORT` no seu `.env` (ex.: 5433 e 8001). O `compose.yaml`, a API e o `just dev-backend` leem essas variáveis.
 
@@ -36,6 +45,11 @@ Verificação rápida: `curl localhost:8000/api/v1/health` → `{"status":"ok","
 | `just migrate` | `alembic upgrade head` |
 | `just migration "mensagem"` | Gera uma migração por autogenerate (revise à mão antes de commitar) |
 | `just dev-backend` | API com reload na porta 8000 |
+| `just seed` | Cria o usuário de desenvolvimento (idempotente; recusado em produção) |
+| `just create-user <email>` | Cria um usuário (senha via prompt, mínimo de 8 caracteres) |
+| `just lint-backend` / `just typecheck-backend` | Ruff (lint + formato) / mypy strict |
+| `just test-backend` | Todos os testes do backend com cobertura (precisa do Docker) |
+| `just test-unit` / `test-integration` / `test-api` | Testes por camada (`unit` roda sem Docker) |
 
 ## Variáveis de ambiente
 

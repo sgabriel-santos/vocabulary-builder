@@ -39,3 +39,27 @@ create-user email:
 # Cria o usuário de desenvolvimento (SEED_USER_EMAIL / SEED_USER_PASSWORD)
 seed:
     cd backend && uv run python -m app.cli seed-dev
+
+# Lint do backend (ruff check + format --check)
+lint-backend:
+    cd backend && uv run ruff check && uv run ruff format --check
+
+# Type check do backend (mypy strict)
+typecheck-backend:
+    cd backend && uv run mypy
+
+# Todos os testes do backend com cobertura (Docker precisa estar rodando)
+test-backend:
+    cd backend && uv run pytest --cov --cov-report=xml --cov-report=term
+
+# Testes unitários (sem Docker)
+test-unit:
+    cd backend && uv run pytest -m unit
+
+# Testes de integração (Postgres via testcontainers)
+test-integration:
+    cd backend && uv run pytest -m integration
+
+# Testes de API (Postgres via testcontainers + fakes)
+test-api:
+    cd backend && uv run pytest -m api

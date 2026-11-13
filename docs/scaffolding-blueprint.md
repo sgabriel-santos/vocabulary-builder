@@ -818,14 +818,14 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 | S1 | T-04 | Config, logging, app | ✅ | `13012a8` |
 | S1 | T-05 | Base ORM, engine, health | ✅ | `13012a8` |
 | S1 | T-06 | Modelos e migração inicial | ✅ | commit final da S1 |
-| S2 | T-07 | Ports, adapters e fakes | ⬜ | |
-| S2 | T-08 | Domínio de auth + testes unitários | ⬜ | |
-| S2 | T-09 | Casos de uso de auth | ⬜ | |
-| S2 | T-10 | Camada HTTP de auth | ⬜ | |
-| S2 | T-11 | CLI create-user e seed-dev | ⬜ | |
-| S2 | T-12 | Exportação do OpenAPI | ⬜ | |
-| S2 | T-13 | Fixtures de teste | ⬜ | |
-| S2 | T-14 | Testes de integração e API | ⬜ | |
+| S2 | T-07 | Ports, adapters e fakes | ✅ | `6dd412b` |
+| S2 | T-08 | Domínio de auth + testes unitários | ✅ | `6dd412b` |
+| S2 | T-09 | Casos de uso de auth | ✅ | `241dcef` |
+| S2 | T-10 | Camada HTTP de auth | ✅ | `241dcef` |
+| S2 | T-11 | CLI create-user e seed-dev | ✅ | `489fc49` |
+| S2 | T-12 | Exportação do OpenAPI | ✅ | `489fc49` |
+| S2 | T-13 | Fixtures de teste | ✅ | commit final da S2 |
+| S2 | T-14 | Testes de integração e API | ✅ | commit final da S2 |
 | S3 | T-15 | Projeto frontend e ferramentas | ⬜ | |
 | S3 | T-16 | Client da API | ⬜ | |
 | S3 | T-17 | Router e rotas | ⬜ | |
@@ -868,3 +868,17 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 - **Versões e decisões práticas:** Python 3.14.7; Node 26.13.1 (LTS Lithium); pnpm 12.18.0 (standalone); just 1.59.0; `postgres:18.7-alpine`; FastAPI 0.162.5, SQLAlchemy 2.1.8, pydantic 2.14.3, pydantic-settings 2.16.2, Alembic 1.20.1, psycopg 3.3.9, structlog 26.1.0, uvicorn 0.54.0, pytest 9.2.0, pytest-asyncio 1.5.0 (opções `asyncio_default_fixture_loop_scope` e `asyncio_default_test_loop_scope`, ambas `session`), mypy 2.4.1, ruff 0.17.5, testcontainers 4.15.0. O parser de dotenv do `just` remove comentários inline do `.env` corretamente. O PostgreSQL 18 registra NOT NULL como constraints nomeadas (`<tabela>_<coluna>_not_null`); não afeta o Alembic. **Rede corporativa com inspeção TLS (Cato Networks):** `curl` falha com "self-signed certificate"; o Node já usa `NODE_EXTRA_CA_CERTS=~/cato-ca.cer`. Para downloads com `curl`, usar `CURL_CA_BUNDLE` apontando para o bundle do sistema + `~/cato-ca.cer`. Na S4, builds Docker que baixam pacotes podem precisar do mesmo tratamento.
 - **Em aberto:** `verify_origin` ainda não tem rota POST para ser exercitado (fica coberto pelos testes de API da S2). `gh` não instalado (opcional, só para `just deploy-rollback`).
 - **Próximo passo:** S2, começando pela T-07 (ports `Clock`/`PasswordHasher`, adapters e fakes).
+
+**S2 — 2026-11-13**
+- **Concluído:** T-07 a T-14. Marco verificado: `just lint-backend`, `just typecheck-backend` e `just test-backend` verdes (33 testes, 0 warnings, cobertura 81%); `just seed` idempotente (e recusado com `APP_ENV=production`); login → `/me` → logout pela API com `curl` na porta 8001 (`Origin: http://localhost:8001`), incluindo `401` genérico, `403` sem `Origin` e `401` com o cookie antigo após o logout.
+- **Desvios do Blueprint:**
+  - **Senha mínima de 8 caracteres** (em vez de 12), a pedido do usuário (`MIN_PASSWORD_LENGTH` em `application/auth/create_user.py`).
+  - Nova exceção `InvalidUserInput(ValueError)` em `application/auth/errors.py` para e-mail/senha fora das regras (a 2.8 não nomeava o erro de validação).
+  - `DUMMY_HASH` cacheado **por tipo de hasher** (`dict[type, str]`), para não verificar um hash fake com o Argon2 (ou o contrário) quando ambos existem no mesmo processo.
+  - `test_settings` fixa `api_port=8000` (e os demais campos de sessão): o `just` exporta o `.env` local (`API_PORT=8001`) e o `Origin` do client de teste deixaria de ser aceito.
+  - `logout` usa `delete_cookie` com os mesmos atributos do `set_cookie` (`httponly`, `secure`, `samesite`).
+  - Testes além da lista da 4.2–4.4: `tests/unit/test_argon2_hasher.py` (adapter real), `tests/integration/test_create_user.py` (normalização, mínimo de 8, e-mail inválido, duplicado), `test_logout_without_session_returns_204` e `test_session_is_renewed_after_one_hour` (variação prevista na 3.5).
+  - Receitas agregadas `lint`, `typecheck`, `test` e `format` ainda não existem: dependem do frontend (S3). Por ora há só as `*-backend` e `test-unit/integration/api`.
+- **Versões e decisões práticas:** testcontainers 4.15: importar de `testcontainers.community.postgres` (o caminho `testcontainers.postgres` emite `DeprecationWarning`). SQLAlchemy 2.1: `Row` se desempacota direto (`session, user = row`); `row.tuple()`/`row._tuple()` estão depreciados. httpx: cookies por request (`cookies=...`) estão depreciados; usar `client.cookies.set(...)`. O marker de cada teste vem da pasta (`pytest_collection_modifyitems` no `tests/conftest.py`), então `pytest -m unit` roda sem Docker. Um container `postgres:18.7-alpine` por sessão de testes (~5 s).
+- **Em aberto:** o cookie de sessão tem `Max-Age` fixo de 60 dias a partir do login, enquanto o servidor renova `expires_at` (expiração deslizante). Um usuário ativo terá o cookie expirado no navegador após 60 dias mesmo com a sessão válida no banco. Decidir se o `current_user` deve reemitir o cookie quando a sessão é renovada.
+- **Próximo passo:** S3, começando pela T-15 (projeto Vite). Proxy do Vite para `http://localhost:${API_PORT}` (8001 no `.env` local) e `just gen-client` usando `uv run python -m app.scripts.export_openapi`.

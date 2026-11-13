@@ -31,7 +31,7 @@ async def resolve_session(
     if row is None:
         return None
 
-    session, user = row.tuple()
+    session, user = row
     now = clock.now()
     if is_session_expired(session.expires_at, now):
         await db.delete(session)
