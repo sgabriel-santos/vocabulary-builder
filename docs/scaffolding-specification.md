@@ -423,7 +423,7 @@ IMAGE_TAG=                       # SHA do commit em produção (definido pelo de
 
 ### 5.4 Segredos em produção
 
-Arquivos no VPS em `/opt/vocab/deploy/secrets/` (dono `deploy`, `chmod 600`), montados via `secrets:` do Compose:
+Arquivos no VPS em `/opt/vocab/deploy/secrets/` (diretório dono `deploy`, `chmod 700`; arquivos `chmod 444`), montados via `secrets:` do Compose. Sem Swarm, o secret é um bind mount que preserva dono e modo do host; o processo da `api` roda como uid 1000, então o arquivo precisa ser legível por ele, e a proteção fica no diretório (detalhes em `deploy/README.md`):
 
 | Arquivo | Consumidor | Montado como |
 |---|---|---|
@@ -728,10 +728,12 @@ stage runtime: caddy:2.<x>-alpine
 
     @immutable path /assets/*
     header @immutable Cache-Control "public, max-age=31536000, immutable"
-    @sw path /sw.js /index.html /manifest.webmanifest
-    header @sw Cache-Control "no-cache"
+    @revalidate not path /assets/*
+    header @revalidate ?Cache-Control "no-cache"
 }
 ```
+
+> O `header` roda antes do `try_files`: um matcher `path /index.html` não pegaria as navegações da SPA (`/`, `/login`...), que recebem o `index.html` por reescrita. Por isso tudo que não é `/assets/*` revalida; o `?` só define o header se a resposta (ex.: da `api`) não tiver um.
 
 
 ### 11.3 `compose.yaml` (desenvolvimento)
@@ -774,7 +776,7 @@ Volumes nomeados: `db_data`, `caddy_data`, `caddy_config`. Secrets: `postgres_pa
 2. Hardening: usuário administrativo com sudo, `PasswordAuthentication no`, `PermitRootLogin no`; `ufw` (ou firewall do provedor) liberando 22, 80, 443/tcp e 443/udp; `unattended-upgrades` ativo.
 3. Instalar Docker Engine + plugin Compose (repositório oficial da Docker).
 4. Criar usuário `deploy` (grupo `docker`, **sem sudo**), com a chave pública de deploy em `authorized_keys` (opções `no-port-forwarding,no-agent-forwarding,no-X11-forwarding`). Não usar `command=`: o CI copia `deploy/` a cada deploy (o que um comando forçado bloquearia) e o grupo `docker` já equivale a root no host, então a restrição não protegeria nada. A proteção está no acesso à chave (seção 12.2). O `deploy.sh` valida o SHA recebido (`^[0-9a-f]{40}$`).
-5. Criar `/opt/vocab/.env` e `/opt/vocab/deploy/secrets/postgres_password` (senha forte, `chmod 600`, dono `deploy`).
+5. Criar `/opt/vocab/.env` (`chmod 600`) e `/opt/vocab/deploy/secrets/postgres_password` (senha forte, `chmod 444`, dentro de `secrets/` com `chmod 700` e dono `deploy`; ver 5.4).
 6. DNS no Registro.br: registro `A` `vocab` → IP do VPS (e `AAAA` se houver IPv6).
 7. Primeiro deploy via GitHub Actions; criar o usuário com `create-user`.
 8. **Na E1:** configurar o backup (11.7) e testar um restore.

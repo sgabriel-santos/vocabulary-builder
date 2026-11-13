@@ -18,7 +18,7 @@ Backend em FastAPI (Python 3.14) + PostgreSQL 18; frontend em React + Vite (Node
 ## Como rodar
 
 ```bash
-just setup        # cria o .env a partir do .env.example e instala as dependências (backend e frontend)
+just setup        # cria o .env a partir do .env.example, instala as dependências (backend e frontend) e os hooks de pre-commit
 just db-up        # sobe o Postgres local (127.0.0.1:5432) e espera ficar saudável
 just migrate      # aplica as migrações
 just seed         # cria o usuário de desenvolvimento (dev@example.com / dev-password-123)
@@ -60,6 +60,14 @@ curl -b cookies.txt localhost:8000/api/v1/auth/me
 | `just test-backend` | Todos os testes do backend com cobertura (precisa do Docker) |
 | `just test-frontend` | Vitest + Testing Library + MSW |
 | `just test-unit` / `test-integration` / `test-api` | Testes por camada (`unit` roda sem Docker) |
+| `just build` | Build do frontend e das imagens Docker `vocab-api:local` e `vocab-web:local` |
+| `uvx pre-commit run --all-files` | Roda todos os hooks (ruff, ESLint, Prettier, gitleaks, checagens de arquivo) em todo o repositório |
+
+## Qualidade, CI e produção
+
+- **Pre-commit** (instalado pelo `just setup`): hooks rápidos a cada commit; configuração em [`.pre-commit-config.yaml`](.pre-commit-config.yaml).
+- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): em todo PR e push fora da `main`, roda as mesmas receitas `just lint-*`, `typecheck-*` e `test-*`, verifica se o client gerado está em dia com a API (`contract`) e procura segredos com gitleaks.
+- **Produção**: imagens `api` ([`backend/Dockerfile`](backend/Dockerfile)) e `web` ([`frontend/Dockerfile`](frontend/Dockerfile), Caddy + SPA), orquestradas por [`deploy/compose.prod.yaml`](deploy/compose.prod.yaml) num VPS. Setup do servidor, deploy, rollback e operação: [`deploy/README.md`](deploy/README.md).
 
 ## Variáveis de ambiente
 

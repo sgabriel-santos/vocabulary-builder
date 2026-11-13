@@ -832,11 +832,11 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 | S3 | T-18 | Telas e features | ✅ | `2a3e88d` |
 | S3 | T-19 | PWA | ✅ | `6fdfb67` |
 | S3 | T-20 | Testes de frontend | ✅ | commit final da S3 |
-| S4 | T-21 | Pre-commit | ⬜ | |
-| S4 | T-22 | CI | ⬜ | |
-| S4 | T-23 | Imagem api | ⬜ | |
-| S4 | T-24 | Imagem web e Caddyfile | ⬜ | |
-| S4 | T-25 | Compose de produção, deploy.sh, runbook | ⬜ | |
+| S4 | T-21 | Pre-commit | ✅ | `fd0be84` |
+| S4 | T-22 | CI | ✅ | `b1085b5`, `15d9f48` |
+| S4 | T-23 | Imagem api | ✅ | `9466871` |
+| S4 | T-24 | Imagem web e Caddyfile | ✅ | `9466871` |
+| S4 | T-25 | Compose de produção, deploy.sh, runbook | ✅ | commit final da S4 |
 | S5 | T-26 | Configuração do VPS (manual) | ⬜ | |
 | S5 | T-27 | Environment do GitHub (manual) | ⬜ | |
 | S5 | T-28 | deploy.yml e Dependabot | ⬜ | |
@@ -905,3 +905,19 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 - **Versões e decisões práticas:** create-vite 9.3.4; Vite 8.3; React 19.3; TypeScript 6.0.3; TanStack Router 1.170 (plugin 1.169), TanStack Query 5.107; openapi-fetch 0.17, openapi-react-query 0.5, openapi-typescript 7.13; Tailwind 4.3; shadcn 4.23; vite-plugin-pwa 2.0 (+ `workbox-window`), `@vite-pwa/assets-generator` 2.0; Vitest 5.1, jsdom 31, MSW 3.0, openapi-msw 2.1, Testing Library (React 16.3, jest-dom 7); ESLint 10.14, typescript-eslint 8.72, react-hooks 7.1, react-refresh 0.5; Prettier 3.10; `@types/node` 26. Vitest 5 esconde `console.log` de testes que passam (usar `--silent=false` para depurar).
 - **Em aberto:** a instalação da PWA no celular só é validável com HTTPS (S5). Continua em aberto o `Max-Age` fixo do cookie (S2). Os componentes de `src/components/ui/` usam `next-themes` (vindo do shadcn) sem `ThemeProvider`; o `useTheme` cai em `"system"`, que é o comportamento desejado por ora.
 - **Próximo passo:** S4, começando pela T-21 (pre-commit). No CI (T-22), o job `frontend` pode usar o Node do `setup-node` (`frontend/.nvmrc`); o `devEngines.runtime` faz o pnpm baixar a mesma versão se divergir. O `contract` roda `just gen-client` e `git diff --exit-code frontend/src/api/`.
+
+**S4 — 2026-11-13**
+- **Concluído:** T-21 a T-25. Marco verificado: `uvx pre-commit run --all-files` verde; CI verde na branch remota (`backend`, `frontend`, `contract`, `secrets`); `just build` gera `vocab-api:local` (307 MB) e `vocab-web:local` (93 MB); `docker compose -f deploy/compose.prod.yaml config` válido com variáveis fictícias. Além do marco: a stack de produção subiu localmente (cópia de `deploy/` com `.env` de produção fictício, portas remapeadas e `APP_DOMAIN=localhost` com a CA interna do Caddy): `migrate` aplicou a `0001` e saiu com 0; `create-user` via `run --rm api`; login → `/me` por HTTPS pelo Caddy, com cookie `Secure` e HSTS; fallback da SPA; HTTP → 308 para HTTPS; o uvicorn usa o IP do `X-Forwarded-For`.
+- **Desvios do Blueprint:**
+  - **Caddyfile, cache do `index.html`:** o `header` roda antes do `try_files`, então `@sw path /sw.js /index.html /manifest.webmanifest` não pegava as navegações da SPA (`/`, `/login`), que voltavam sem `Cache-Control`. Agora `@revalidate not path /assets/*` + `header @revalidate ?Cache-Control "no-cache"` (o `?` preserva o header da `api`, se houver). Spec §11.2 atualizada.
+  - **Permissão do secret:** sem Swarm, o secret do Compose é um bind mount que preserva dono e modo do host, e a `api` roda como uid 1000. Com `chmod 600` e dono `deploy`, a leitura só funciona se o `deploy` tiver uid 1000. Regra adotada: `secrets/` com `chmod 700` e dono `deploy`; `postgres_password` com `chmod 444`. Spec §5.4 e §11.6 e runbook atualizados.
+  - **`check-yaml` exclui `frontend/pnpm-lock.yaml`:** o lockfile do pnpm 12 tem vários documentos YAML. Os arquivos gerados (`routeTree.gen.ts`, `schema.d.ts`) ficam fora de todos os hooks.
+  - **Hooks do frontend:** dois hooks locais (`eslint --no-warn-ignored` e `prettier --write --ignore-unknown`), com o prefixo `frontend/` removido dos caminhos por `bash -c '... "${@#frontend/}"' --`.
+  - **`astral-sh/setup-uv@v10.3.3`:** a action não publica tag maior flutuante (`@v10` quebrou o primeiro run). As demais usam tag maior (`checkout@v7`, `setup-node@v7`, `pnpm/action-setup@v6`, `extractions/setup-just@v4`, `upload-artifact@v7`, `gitleaks-action@v3`).
+  - **CI:** `concurrency` cancela runs antigos fora da `main`; o job `secrets` tem `pull-requests: read` (a action lista os commits do PR) e `GITLEAKS_ENABLE_COMMENTS: false`; a cobertura sobe como artefato `backend-coverage`; `persist-credentials: false` nos checkouts.
+  - **`deploy.sh`:** o `docker logout` fica num `trap EXIT` (cobre sucesso e falha); `APP_DOMAIN` é lido do `.env` com `grep` (sem `source`); a limpeza de imagens usa `docker image ls ... | sort -r | tail -n +3`.
+  - `backend/Dockerfile` copia também o `.python-version`; `frontend/.dockerignore` ignora ainda `.tanstack/`, `Dockerfile` e `.dockerignore`.
+  - **Receita `just build`** adicionada. **`just deploy-rollback`** fica para a S5, junto com o `deploy.yml` que ela dispara (o runbook já a cita).
+- **Versões e decisões práticas:** `python:3.14.10-slim`, `ghcr.io/astral-sh/uv:0.12.13`, `node:26.13.1-slim` (pnpm 12.18.0 via `npm install -g`), `caddy:2.11.9-alpine`, `postgres:18.7-alpine`; pre-commit 4.7.0 com pre-commit-hooks v6.0.0, ruff-pre-commit v0.17.5 e gitleaks v8.30.1 (a mesma versão no CI, via `GITLEAKS_VERSION`); Docker Compose v5.1.3 (aceita `!override` em arquivos de override). O build das imagens funcionou através do proxy TLS da Cato sem ajustes (houve só um timeout passageiro do npm, que se recuperou sozinho). O repositório é **privado**: a API pública do GitHub responde 404 e o status do CI é conferido pela interface web (ou com `gh`, ainda não instalado).
+- **Em aberto:** a permissão `444` do secret foi validada só com uid 1000 local; confirmar no VPS (S5) que a `api` lê `/run/secrets/postgres_password` com o uid real do `deploy`. Continuam em aberto o `Max-Age` fixo do cookie (S2) e a validação da PWA no celular (S5).
+- **Próximo passo:** S5. T-26 (VPS, seguindo `deploy/README.md` §1) e T-27 (Environment `production`, §2) são manuais. Depois, a T-28 (`deploy.yml` + `dependabot.yml` + receita `deploy-rollback`).
