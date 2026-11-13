@@ -31,3 +31,11 @@ migrate:
 # Gera uma migração por autogenerate (revise à mão antes de commitar)
 migration msg:
     cd backend && uv run alembic revision --autogenerate -m "{{msg}}"
+
+# Cria um usuário (senha via prompt)
+create-user email:
+    cd backend && uv run python -m app.cli create-user {{email}}
+
+# Cria o usuário de desenvolvimento (SEED_USER_EMAIL / SEED_USER_PASSWORD)
+seed:
+    cd backend && uv run python -m app.cli seed-dev
