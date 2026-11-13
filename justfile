@@ -11,6 +11,7 @@ default:
 setup:
     [ -f .env ] || cp .env.example .env
     cd backend && uv sync
+    pnpm --dir frontend install
 
 # Sobe o Postgres local e espera ficar saudável
 db-up:
@@ -23,6 +24,14 @@ db-down:
 # API com reload (porta API_PORT, padrão 8000)
 dev-backend:
     cd backend && uv run uvicorn app.main:create_app --factory --reload --port ${API_PORT:-8000}
+
+# Frontend com HMR em :5173 (proxy de /api para a API_PORT)
+dev-frontend:
+    pnpm --dir frontend dev
+
+# Build de produção do frontend (gera frontend/dist)
+build-frontend:
+    pnpm --dir frontend build
 
 # Aplica as migrações no banco local
 migrate:
@@ -44,9 +53,17 @@ seed:
 lint-backend:
     cd backend && uv run ruff check && uv run ruff format --check
 
+# Lint do frontend (eslint + prettier --check)
+lint-frontend:
+    pnpm --dir frontend lint && pnpm --dir frontend format:check
+
 # Type check do backend (mypy strict)
 typecheck-backend:
     cd backend && uv run mypy
+
+# Type check do frontend (tsc)
+typecheck-frontend:
+    pnpm --dir frontend typecheck
 
 # Todos os testes do backend com cobertura (Docker precisa estar rodando)
 test-backend:
