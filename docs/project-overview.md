@@ -3,7 +3,7 @@
 > **Propósito deste documento:** servir como fonte única de contexto de alto nível para agentes de IA (e humanos) que vão participar do desenvolvimento. Ele descreve o problema, os objetivos, o escopo funcional, as decisões técnicas já tomadas, o modelo de domínio proposto, o roadmap e as questões em aberto.
 >
 > **Status:** ideia inicial / pré-desenvolvimento.
-> **Versão do documento:** 1.1 — adiciona F-16 (gerador de palavras frequentes), F-17 (estúdio de vídeo), F-18 (diário) e F-19 (modelo do aprendiz).
+> **Versão do documento:** 1.3 — registra que é um projeto pessoal, não acadêmico (§3). Versão 1.2 resolve q2 (autenticação) e q3 (hospedagem), consolida a stack escolhida no scaffolding (ver [`scaffolding-specification.md`](scaffolding-specification.md) e [`adr/`](adr/README.md)). Versão 1.1 adicionou F-16 (gerador de palavras frequentes), F-17 (estúdio de vídeo), F-18 (diário) e F-19 (modelo do aprendiz).
 > **Nome do projeto:** provisório ("Vocabulary Builder"). Pode ser alterado.
 > **Idioma do código:** inglês (nomes de variáveis, classes, tabelas, endpoints, commits). **Idioma da documentação e da interface:** português (pt-BR), com o conteúdo de estudo em inglês.
 
@@ -67,6 +67,7 @@ Um aplicativo web (instalável no celular como PWA) onde o usuário **joga palav
 ## 3. Público-alvo e premissas
 
 - **Uso pessoal, single-user.** Não é um produto comercial neste momento. Publicação e eventual abertura a outros usuários serão tratadas no futuro.
+- **Projeto pessoal, não acadêmico.** Apesar de o repositório ficar numa pasta `FIAP/`, este **não** é um trabalho da FIAP nem tem avaliação. O objetivo é o aprendizado de inglês do próprio usuário. Decisões de arquitetura e infraestrutura se justificam pelo uso real, não por demonstrar padrões.
 - O usuário é falante nativo de português (pt-BR), aprendendo inglês, com nível intermediário (premissa; ver questões em aberto).
 - O usuário é desenvolvedor fullstack experiente (foco em backend, experiência como tech lead). O projeto também pode servir como ambiente de aprendizado e experimentação.
 - Consequências da premissa single-user:
@@ -395,7 +396,7 @@ Regra: toda alteração no modelo do aprendiz é registrada como `KnowledgeEvent
 | Desempenho | Captura de termo responde em < 300 ms (enriquecimento é assíncrono). Sessão de revisão sem esperas perceptíveis entre cartões (pré-carregar o próximo cartão e seus áudios). |
 | Disponibilidade | Uso pessoal; sem SLA formal. Falhas de APIs externas não podem bloquear a revisão de cartões já enriquecidos. |
 | Resiliência | Jobs de IA com retries e backoff; termos com falha de enriquecimento ficam marcados como `failed` e podem ser reprocessados manualmente. |
-| Segurança | Chaves de API **somente no backend**, nunca expostas ao frontend. HTTPS obrigatório em produção (também exigido pelo navegador para acesso ao microfone). Autenticação simples (ver questões em aberto: login com senha única, magic link ou provedor externo). |
+| Segurança | Chaves de API **somente no backend**, nunca expostas ao frontend. HTTPS obrigatório em produção (também exigido pelo navegador para acesso ao microfone). Autenticação simples: e-mail + senha com sessão server-side em cookie `HttpOnly` ([ADR 0003](adr/0003-auth-password-server-side-sessions.md)). |
 | Privacidade | Gravações de voz são dados pessoais. Armazenar com acesso privado (URLs assinadas), política de retenção configurável, opção de apagar. |
 | Custos | Meta: dentro de camadas gratuitas ou poucos dólares/mês. Cachear tudo que for gerado (enriquecimento, imagens, TTS). Registrar uso/custo estimado por chamada de API. |
 | Observabilidade | Logs estruturados, registro de chamadas a provedores de IA (provedor, modelo, tokens, latência, custo estimado, sucesso/erro). |
@@ -411,8 +412,20 @@ Regra: toda alteração no modelo do aprendiz é registrada como `KnowledgeEvent
 |---|---|---|
 | Backend | **Python + FastAPI** | Ecossistema Python é o mais forte para IA e áudio; async nativo é ideal para chamadas I/O-bound a APIs externas; Pydantic integra com saídas estruturadas de LLM; OpenAPI gerado automaticamente. |
 | Frontend | **React + TypeScript + Vite (SPA)** | Simples, maduro, ótimo suporte a APIs do navegador (MediaRecorder). SSR/Next.js descartado: não há necessidade de SEO e adicionaria um segundo servidor sem benefício. |
+| Ferramentas Python | **uv + Python 3.14** | Velocidade e reprodutibilidade ([ADR 0004](adr/0004-python-tooling-uv-python-314.md)). |
+| Ferramentas Node | **pnpm + Node 26 LTS** | [ADR 0005](adr/0005-frontend-tooling-pnpm-node-26.md). |
+| Persistência | **PostgreSQL 18 + SQLAlchemy 2.0 async + psycopg 3 + Alembic** | Domínio separado do ORM onde há regra ([ADR 0006](adr/0006-persistence-sqlalchemy-psycopg-domain-separation.md)). |
+| Testes backend | **pytest + pytest-asyncio + testcontainers** | [ADR 0007](adr/0007-backend-testing-testcontainers.md). |
+| Roteamento / estado de servidor | **TanStack Router + TanStack Query** | [ADR 0008](adr/0008-frontend-routing-tanstack-router.md). |
+| Client da API | **openapi-typescript + openapi-fetch + openapi-react-query** | [ADR 0009](adr/0009-api-client-openapi-fetch-versioned.md). |
+| Hospedagem | **VPS + Docker Compose + Caddy** | [ADR 0001](adr/0001-hosting-vps-compose-caddy.md), [ADR 0002](adr/0002-postgres-on-vps-with-offsite-backup.md), [ADR 0010](adr/0010-docker-images-and-compose-layout.md). |
+| Autenticação | **E-mail + senha (Argon2) + sessão server-side** | [ADR 0003](adr/0003-auth-password-server-side-sessions.md). |
+| Qualidade | **Ruff, mypy strict, ESLint + Prettier, Vitest + Testing Library + MSW, pre-commit** | Detalhes na [especificação do scaffolding](scaffolding-specification.md#9-ferramentas-de-qualidade). |
+| UI / PWA | **Tailwind CSS v4 + shadcn/ui, vite-plugin-pwa** | Especificação do scaffolding, seção 8. |
 
 ### 7.2 Recomendações (a confirmar na implementação)
+
+> Os itens já decididos no scaffolding estão na tabela 7.1 e na [especificação do scaffolding](scaffolding-specification.md). Os demais itens desta seção continuam como recomendações para as entregas que os usarem.
 
 **Backend**
 
@@ -458,9 +471,10 @@ Regra: toda alteração no modelo do aprendiz é registrada como `KnowledgeEvent
 
 ### 7.3 Ambiente de desenvolvimento
 
-- Monorepo com `backend/` e `frontend/`.
-- `docker-compose` para Postgres, Redis (se usado) e MinIO.
-- Variáveis de ambiente via `.env` (com `.env.example` versionado, sem segredos).
+- Monorepo com `backend/` e `frontend/`; comandos centralizados no `justfile`.
+- `compose.yaml` de desenvolvimento com Postgres (Redis e MinIO entram quando necessários); backend e frontend rodam nativos com hot reload.
+- Produção descrita em `deploy/compose.prod.yaml` (ver [especificação do scaffolding](scaffolding-specification.md#11-docker-e-deploy)).
+- Variáveis de ambiente via `.env` (com `.env.example` versionado, sem segredos); segredos de produção em `/run/secrets`.
 
 ## 8. Arquitetura
 
@@ -502,12 +516,16 @@ backend/
     adapters/       # implementações: llm/, tts/, image/, stt/, pronunciation/, storage/, db/
     workers/        # definição dos jobs assíncronos
     core/           # config, logging, segurança, DI
+    cli/            # comandos administrativos (ex.: create-user)
   migrations/
   tests/
     unit/
     integration/
+    api/            # testes de endpoint (app completo, provedores fake)
     fakes/          # implementações fake dos ports para testes
 ```
+
+Estrutura completa (incluindo `deploy/` e arquivos de configuração): [especificação do scaffolding](scaffolding-specification.md#2-estrutura-de-diretórios).
 
 Interfaces (ports) previstas:
 
@@ -528,6 +546,7 @@ Interfaces (ports) previstas:
 frontend/
   src/
     api/            # client gerado + hooks TanStack Query
+    routes/         # rotas por arquivo (TanStack Router); finas, montam componentes de features/
     features/
       capture/      # adicionar termo, importação em lote
       terms/        # lista, detalhe, edição
@@ -982,14 +1001,14 @@ Limiares configuráveis e a calibrar com uso real.
 
 ## 14. Roadmap por fases
 
-> As Fases 0 e 1 estão detalhadas em entregas incrementais (E0–E5) em [`docs/delivery-plan.md`](docs/delivery-plan.md). Decisão: o deploy em produção acontece desde a E0 (não mais apenas na Fase 5).
+> As Fases 0 e 1 estão detalhadas em entregas incrementais (E0–E5) em [`docs/delivery-plan.md`](delivery-plan.md). Decisão: o deploy em produção acontece desde a E0 (não mais apenas na Fase 5).
 
 ### Fase 0 — Fundação
-- Monorepo, docker-compose (Postgres, MinIO, Redis se necessário), CI com lint e testes.
+- Monorepo, docker-compose de dev só com Postgres, CI com lint, tipos e testes, deploy automático em produção (detalhes na E0 do [`delivery-plan.md`](delivery-plan.md) e na [especificação do scaffolding](scaffolding-specification.md)).
 - Backend FastAPI com estrutura de camadas, config, logging, migrações.
 - Frontend Vite + React + TS, client gerado do OpenAPI, roteamento, layout base, PWA básica.
 - Autenticação simples.
-- Ports e fakes de todos os provedores externos.
+- MinIO, Redis/fila e os ports e fakes de provedores externos **não** entram aqui: cada um chega na entrega que o usa (E2, E4...).
 
 ### Fase 1 — MVP (ciclo principal funcionando)
 - F-01 captura individual e em lote (sem extensão).
@@ -1039,8 +1058,8 @@ Limiares configuráveis e a calibrar com uso real.
 ## 15. Questões em aberto
 
 1. **Nome definitivo do projeto.**
-2. **Autenticação:** senha única com sessão, magic link por e-mail ou provedor OAuth?
-3. **Hospedagem:** onde rodar backend, worker, banco e storage (priorizando camadas gratuitas ou baratas)?
+2. ~~**Autenticação:** senha única com sessão, magic link por e-mail ou provedor OAuth?~~ **Resolvida:** e-mail + senha (Argon2) com sessão server-side em cookie `HttpOnly` ([ADR 0003](adr/0003-auth-password-server-side-sessions.md)).
+3. ~~**Hospedagem:** onde rodar backend, worker, banco e storage (priorizando camadas gratuitas ou baratas)?~~ **Resolvida:** VPS Hostinger (Brasil) com Docker Compose e Caddy; Postgres em container com backup externo ([ADR 0001](adr/0001-hosting-vps-compose-caddy.md), [ADR 0002](adr/0002-postgres-on-vps-with-offsite-backup.md)). Storage de arquivos (E4) ainda a definir.
 4. **Fila de jobs:** `arq` + Redis ou fila em tabela do Postgres (menos infraestrutura)?
 5. **Provedor de LLM** principal e modelo a usar em cada operação (custo × qualidade).
 6. **Provedor de avaliação de pronúncia:** confirmar Azure (verificar limites da camada gratuita e suporte a prosódia) ou alternativa.

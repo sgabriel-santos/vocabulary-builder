@@ -7,16 +7,18 @@
 ## Decisões deste plano
 
 - **Deploy desde a E0.** A primeira entrega já vai para um ambiente público com HTTPS e autenticação. Consequência: hospedagem (q3) e autenticação (q2) passam a ser decisões de scaffolding.
-- **Hospedagem:** decidida no `scaffolding-brainstorm`.
-- **Infraestrutura entra só quando necessária:** Redis/fila na E2, object storage na E4.
+- **Hospedagem (q3, resolvida):** VPS (Hostinger KVM 2, Brasil) com Docker Compose e Caddy; frontend e API na mesma origem; Postgres em container no VPS com backup diário criptografado em storage externo (implementado na E1, quando passam a existir dados reais). Ver [ADR 0001](adr/0001-hosting-vps-compose-caddy.md) e [ADR 0002](adr/0002-postgres-on-vps-with-offsite-backup.md).
+- **Autenticação (q2, resolvida):** e-mail + senha com sessão server-side em cookie `HttpOnly`. Ver [ADR 0003](adr/0003-auth-password-server-side-sessions.md).
+- **Scaffolding completo:** [`scaffolding-specification.md`](scaffolding-specification.md).
+- **Infraestrutura entra só quando necessária:** backup externo na E1, Redis/fila na E2, object storage na E4.
 - **Ordem:** captura → enriquecimento → revisão (a IA vem antes da revisão).
 
 ## Visão geral
 
 | Entrega | Valor para o usuário | Infraestrutura nova | Decisões necessárias |
 |---|---|---|---|
-| E0 | (nenhum, só risco reduzido) | Deploy, CI/CD, autenticação, Postgres | q2, q3 |
-| E1 | Para de perder palavras | — | — |
+| E0 | (nenhum, só risco reduzido) | Deploy, CI/CD, autenticação, Postgres | q2, q3 (resolvidas) |
+| E1 | Para de perder palavras | Backup externo | — |
 | E2 | Termos explicados automaticamente | Fila, worker, LLM | q4, q5 |
 | E3 | Hábito diário de revisão | FSRS | q10 |
 | E4 | Ouvir e praticar | Object storage, TTS | provedor TTS, q7, q9 |
@@ -32,19 +34,20 @@ Ao final da E5, o **critério de pronto do MVP** (seção 14) é atingido.
 
 **Escopo:**
 - Monorepo `backend/` + `frontend/`.
-- Backend FastAPI com estrutura em camadas (seção 8.2), `GET /health`, configuração via `.env`, logs estruturados, Alembic com a migração inicial (`User`).
+- Backend FastAPI com estrutura em camadas (seção 8.2), `GET /health`, configuração via `.env`, logs estruturados, Alembic com a migração inicial (`users`, `sessions`).
 - Frontend Vite + React + TS, roteamento, layout base, PWA mínima instalável, client gerado do OpenAPI, tela que consome `/health`.
-- Autenticação simples (login/logout + rota protegida).
-- Qualidade: Ruff, mypy/pyright, pytest, ESLint, Prettier, Vitest, com um teste de exemplo em cada lado.
-- `docker-compose` local apenas com Postgres.
-- CI (lint + testes a cada push) e CD (deploy automático na `main`).
-- Produção com HTTPS, banco gerenciado e segredos fora do repositório.
+- Autenticação simples (login/logout + rota protegida): e-mail + senha, sessão server-side em cookie.
+- Qualidade: Ruff, mypy, pytest, ESLint, Prettier, Vitest, com um teste de exemplo em cada lado.
+- `compose.yaml` local apenas com Postgres.
+- CI (lint + testes a cada push) e CD (deploy automático na `main` com smoke test; rollback manual com um comando).
+- Produção com HTTPS (VPS + Caddy), Postgres em container e segredos fora do repositório.
+- Detalhes: [`scaffolding-specification.md`](scaffolding-specification.md).
 
-**Fora do escopo:** qualquer `F-xx`, fila, worker, storage de arquivos.
+**Fora do escopo:** qualquer `F-xx`, fila, worker, storage de arquivos, backup externo (E1), rollback automático.
 
-**Decisões necessárias:** q2 (autenticação), q3 (hospedagem).
+**Decisões necessárias:** q2 (autenticação) e q3 (hospedagem), ambas resolvidas no `scaffolding-brainstorm` (ADRs 0001–0003).
 
-**Pronto quando:** a URL pública abre no celular, a PWA instala, o login funciona e o status do backend aparece; um push na `main` publica automaticamente.
+**Pronto quando:** a URL pública abre no celular, a PWA instala, o login funciona e o status do backend aparece; um merge na `main` publica automaticamente e um deploy com falha pode ser revertido com `just deploy-rollback <sha>`.
 
 ---
 
@@ -58,12 +61,13 @@ Ao final da E5, o **critério de pronto do MVP** (seção 14) é atingido.
 - F-01: deduplicação por `normalized_text`; termo existente recebe nova `Occurrence`.
 - F-13 básico: lista com busca e ordenação; detalhe com ocorrências; edição e exclusão.
 - Modelo: `Term`, `Occurrence` (e opcionalmente `Tag`). Termos nascem com `status = pending`.
+- Infra: backup diário criptografado em storage externo (`deploy/backup.sh`, systemd timer, `age` + `rclone`, ping de monitoramento), conforme spec §11.7 e ADR 0002.
 
 **Fora do escopo:** enriquecimento, cartões, filtros por estado/CEFR.
 
 **Decisões necessárias:** nenhuma bloqueante.
 
-**Pronto quando:** a lista atual do usuário é importada sem duplicatas e capturar um termo pelo celular leva poucos segundos.
+**Pronto quando:** o backup diário chega ao storage externo e um restore de teste funciona (**antes** de importar a lista real); a lista atual do usuário é importada sem duplicatas; capturar um termo pelo celular leva poucos segundos.
 
 ---
 
@@ -153,4 +157,5 @@ As Fases 2 a 5 do overview (pronúncia, diário, imagens, estúdio de vídeo, co
 ## Fluxo de trabalho por entrega
 
 - **E0:** `scaffolding-brainstorm` → `scaffolding-blueprint` → `scaffolding-development` → `scaffolding-review`.
-- **E1 em diante:** `feature-spec-brainstorm` → `feature-blueprint` → `feature-development` → `feature-review`.
+- **Entregas com regra de negócio relevante** (E2, E3, E5 e as fases seguintes): fluxo completo `feature-spec-brainstorm` → `feature-blueprint` → `feature-development` → `feature-review`.
+- **Entregas simples, de CRUD** (ex.: E1): **trilha leve**, com um FRD curto (escopo, regras, critérios de aceite) e implementação direta, sem blueprint nem relatórios intermediários. O `feature-review` é opcional. Em caso de dúvida sobre qual trilha usar, perguntar ao usuário.

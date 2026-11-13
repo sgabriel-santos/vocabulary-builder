@@ -4,8 +4,14 @@ Instruções para agentes de IA que trabalham neste repositório.
 
 ## Contexto do projeto
 
+As instruções canônicas para agentes (stack, estrutura, convenções, o que fazer e não fazer, decisões arquiteturais) estão no `AGENTS.md`:
+
+@AGENTS.md
+
 - Visão, escopo, modelo de domínio e roadmap: [`docs/project-overview.md`](docs/project-overview.md)
 - Plano de entregas: [`docs/delivery-plan.md`](docs/delivery-plan.md)
+- Especificação do scaffolding: [`docs/scaffolding-specification.md`](docs/scaffolding-specification.md)
+- Decisões arquiteturais: [`docs/adr/`](docs/adr/README.md)
 
 ## Commits
 
