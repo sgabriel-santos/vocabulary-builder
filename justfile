@@ -7,11 +7,12 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
     @just --list
 
-# Instala dependências e cria o .env a partir do .env.example
+# Instala dependências, hooks de pre-commit e cria o .env a partir do .env.example
 setup:
     [ -f .env ] || cp .env.example .env
     cd backend && uv sync
     pnpm --dir frontend install
+    uvx pre-commit install --install-hooks
 
 # Sobe o Postgres local e espera ficar saudável
 db-up:
