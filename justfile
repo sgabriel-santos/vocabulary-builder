@@ -38,6 +38,11 @@ dev-frontend:
 build-frontend:
     pnpm --dir frontend build
 
+# Build do frontend e das imagens Docker `api` e `web` (tag local)
+build: build-frontend
+    docker build -t vocab-api:local backend
+    docker build -t vocab-web:local frontend
+
 # Aplica as migrações no banco local
 migrate:
     cd backend && uv run alembic upgrade head

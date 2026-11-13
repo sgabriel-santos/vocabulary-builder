@@ -1,0 +1,32 @@
+# Produção: HTTPS automático (Let's Encrypt) para APP_DOMAIN.
+# /api/* vai para a api; o resto é a SPA (fallback para index.html).
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "microphone=(self), camera=()"
+		-Server
+	}
+
+	# Assets com hash no nome: cache longo. Todo o resto (index.html servido em
+	# qualquer rota da SPA, sw.js, manifest, ícones) revalida a cada acesso.
+	# O `header` roda antes do try_files, então casar `path /index.html` não pegaria
+	# as navegações; `?` só define o header se a resposta (ex.: da api) não tiver um.
+	@immutable path /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	@revalidate not path /assets/*
+	header @revalidate ?Cache-Control "no-cache"
+}
