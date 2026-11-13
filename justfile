@@ -21,6 +21,10 @@ db-up:
 db-down:
     docker compose down
 
+# Postgres + API + frontend em paralelo (Ctrl+C encerra tudo)
+dev: db-up
+    trap 'kill 0' EXIT; just dev-backend & just dev-frontend & wait
+
 # API com reload (porta API_PORT, padrão 8000)
 dev-backend:
     cd backend && uv run uvicorn app.main:create_app --factory --reload --port ${API_PORT:-8000}
@@ -80,3 +84,10 @@ test-integration:
 # Testes de API (Postgres via testcontainers + fakes)
 test-api:
     cd backend && uv run pytest -m api
+
+# Regenera o client da API (frontend/src/api/schema.d.ts) a partir do OpenAPI do backend
+gen-client:
+    tmp="$(mktemp --suffix .json)"; \
+    trap 'rm -f "$tmp"' EXIT; \
+    (cd backend && uv run python -m app.scripts.export_openapi) > "$tmp"; \
+    pnpm --dir frontend exec openapi-typescript "$tmp" -o src/api/schema.d.ts

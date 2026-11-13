@@ -33,6 +33,12 @@ export default defineConfig([
     },
   },
   {
+    // Arquivos de rota exportam só `Route`; o HMR deles é feito pelo plugin do
+    // TanStack Router (autoCodeSplitting separa o componente), não pelo react-refresh.
+    files: ["src/routes/**/*.tsx"],
+    rules: { "react-refresh/only-export-components": "off" },
+  },
+  {
     files: ["eslint.config.js"],
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
