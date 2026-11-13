@@ -173,7 +173,7 @@ vocabulary-builder/
 │   │   │   ├── rate_limit.py        # Rate limit em memória para o login
 │   │   │   └── container.py         # Composition root: providers (clock, hasher, sessão de DB)
 │   │   ├── cli/
-│   │   │   └── __main__.py          # `python -m app.cli create-user <email>` (senha via prompt)
+│   │   │   └── __main__.py          # `create-user <email>` (senha via prompt) e `seed-dev`
 │   │   └── scripts/
 │   │       └── export_openapi.py    # Exporta app.openapi() para JSON sem subir servidor
 │   └── tests/
@@ -400,6 +400,10 @@ SESSION_TTL_DAYS=60              # Expiração deslizante
 SESSION_COOKIE_SECURE=false      # true em produção (HTTPS)
 LOGIN_RATE_LIMIT=5/minute        # Tentativas por IP
 
+# ---------- Seed de desenvolvimento (just seed; recusado em produção) ----------
+SEED_USER_EMAIL=dev@example.com
+SEED_USER_PASSWORD=dev-password-123
+
 # ---------- Produção (lidas pelo compose.prod.yaml) ----------
 IMAGE_TAG=                       # SHA do commit em produção (definido pelo deploy.sh)
 ```
@@ -414,6 +418,7 @@ IMAGE_TAG=                       # SHA do commit em produção (definido pelo de
 | `POSTGRES_*` | Montam a URL `postgresql+psycopg://...` no `Settings` (propriedade `database_url`). |
 | `SESSION_*` | Nome, validade e flag `Secure` do cookie de sessão. |
 | `LOGIN_RATE_LIMIT` | Limite de tentativas de login por IP. |
+| `SEED_USER_*` | Credenciais do usuário criado por `just seed` (só fora de produção). |
 | `IMAGE_TAG` | Tag das imagens no `compose.prod.yaml`. |
 
 ### 5.4 Segredos em produção
@@ -853,6 +858,7 @@ Todos via `just` (instalação: `uv tool install rust-just`). `just --list` most
 | `just migrate` | `alembic upgrade head` no banco local. |
 | `just migration "msg"` | `alembic revision --autogenerate -m "msg"` (revisar o arquivo gerado). |
 | `just create-user <email>` | Cria usuário (senha via prompt). |
+| `just seed` | `python -m app.cli seed-dev`: cria o usuário de desenvolvimento (`SEED_USER_*`); idempotente e recusado em produção. |
 | `just lint` | `lint-backend` (ruff check + ruff format --check) + `lint-frontend` (eslint + prettier --check). |
 | `just format` | `ruff format` + `ruff check --fix` + `prettier --write`. |
 | `just typecheck` | `typecheck-backend` (mypy) + `typecheck-frontend` (tsc --noEmit). |
