@@ -1,0 +1,40 @@
+# Ambiente local (segredos) — o .env.example é versionado
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Node / frontend
+node_modules/
+dist/
+dev-dist/
+coverage/
+*.tsbuildinfo
+
+# Segredos de produção (só o placeholder é versionado)
+deploy/secrets/*
+!deploy/secrets/.gitkeep
+
+# Logs e temporários
+*.log
+tmp/
+
+# IDEs e editores
+.idea/
+.vscode/
+*.swp
+*~
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
