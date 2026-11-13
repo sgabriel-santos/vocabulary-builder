@@ -23,3 +23,11 @@ db-down:
 # API com reload (porta API_PORT, padrão 8000)
 dev-backend:
     cd backend && uv run uvicorn app.main:create_app --factory --reload --port ${API_PORT:-8000}
+
+# Aplica as migrações no banco local
+migrate:
+    cd backend && uv run alembic upgrade head
+
+# Gera uma migração por autogenerate (revise à mão antes de commitar)
+migration msg:
+    cd backend && uv run alembic revision --autogenerate -m "{{msg}}"

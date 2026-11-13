@@ -812,12 +812,12 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 
 | Sessão | Tarefa | Descrição | Status | Commit |
 |---|---|---|---|---|
-| S1 | T-01 | Ferramentas locais (manual) | ⬜ | |
-| S1 | T-02 | Base do repositório | ⬜ | |
-| S1 | T-03 | Projeto Python | ⬜ | |
-| S1 | T-04 | Config, logging, app | ⬜ | |
-| S1 | T-05 | Base ORM, engine, health | ⬜ | |
-| S1 | T-06 | Modelos e migração inicial | ⬜ | |
+| S1 | T-01 | Ferramentas locais (manual) | ✅ | — (manual) |
+| S1 | T-02 | Base do repositório | ✅ | `b701a15` |
+| S1 | T-03 | Projeto Python | ✅ | `1266344` |
+| S1 | T-04 | Config, logging, app | ✅ | `13012a8` |
+| S1 | T-05 | Base ORM, engine, health | ✅ | `13012a8` |
+| S1 | T-06 | Modelos e migração inicial | ✅ | commit final da S1 |
 | S2 | T-07 | Ports, adapters e fakes | ⬜ | |
 | S2 | T-08 | Domínio de auth + testes unitários | ⬜ | |
 | S2 | T-09 | Casos de uso de auth | ⬜ | |
@@ -855,4 +855,16 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 > - **Em aberto:** problemas conhecidos, verificações que falharam.
 > - **Próximo passo:** primeira ação da próxima sessão.
 
-_(nenhuma sessão executada ainda)_
+**S1 — 2026-11-12**
+- **Concluído:** T-01 a T-06. Marco verificado: `just db-up` (Postgres saudável), `just migrate`, `GET /api/v1/health` → `200 {"status":"ok","database":"ok"}` (e `503` com o banco parado), `alembic downgrade base` sem erro, `alembic check` sem drift, `ruff`/`mypy` verdes.
+- **Desvios do Blueprint:**
+  - **Node padrão do sistema continua 24.18.0** (`nvm alias default 24.18.0`, em vez de `nvm alias default 26`): o Claude Code e outro projeto local (QuickSilver) usam o Node 24 global. O Node 26.13.1 está instalado e é usado só neste projeto (`nvm use` na pasta `frontend/`, via `.nvmrc`). Nas receitas do `just` que chamam o frontend (S3), garantir Node 26 no PATH.
+  - **`POSTGRES_PORT` passou a definir a porta do host no `compose.yaml`** (`127.0.0.1:${POSTGRES_PORT:-5432}:5432`): a 5432 está ocupada pelo Postgres do QuickSilver. O `.env` local usa **5433**; o `.env.example` mantém 5432.
+  - **Nova configuração `API_PORT`** (default 8000; `.env` local **8001**, porque a 8000 é do backend do QuickSilver): usada por `just dev-backend` e por `Settings.allowed_origins` em dev (`http://localhost:{api_port}`). **Na S3, o proxy do Vite deve apontar para `http://localhost:${API_PORT}`**, e o `curl` manual com `Origin` deve usar a porta do `.env`.
+  - `InMemoryRateLimiter` (com `time_func` injetável) criado na T-04, porque o `create_app()` já o instancia; os testes dele seguem na S2.
+  - `just setup` usa `[ -f .env ] || cp .env.example .env` em vez de `cp -n` (o GNU coreutils emite aviso de não-portável). Ainda não roda `pnpm install` (frontend nasce na S3) nem pre-commit (T-21).
+  - `alembic.ini` mantém `script_location = %(here)s/migrations` (padrão do Alembic 1.20, funciona de qualquer diretório) e `migrations/script.py.mako` foi reescrito com tipos modernos (`str | None`, `collections.abc`) para passar no ruff.
+  - O `README.md` foi criado e entrou no commit da T-06 (em vez da T-02), para só citar receitas que já existem.
+- **Versões e decisões práticas:** Python 3.14.7; Node 26.13.1 (LTS Lithium); pnpm 12.18.0 (standalone); just 1.59.0; `postgres:18.7-alpine`; FastAPI 0.162.5, SQLAlchemy 2.1.8, pydantic 2.14.3, pydantic-settings 2.16.2, Alembic 1.20.1, psycopg 3.3.9, structlog 26.1.0, uvicorn 0.54.0, pytest 9.2.0, pytest-asyncio 1.5.0 (opções `asyncio_default_fixture_loop_scope` e `asyncio_default_test_loop_scope`, ambas `session`), mypy 2.4.1, ruff 0.17.5, testcontainers 4.15.0. O parser de dotenv do `just` remove comentários inline do `.env` corretamente. O PostgreSQL 18 registra NOT NULL como constraints nomeadas (`<tabela>_<coluna>_not_null`); não afeta o Alembic. **Rede corporativa com inspeção TLS (Cato Networks):** `curl` falha com "self-signed certificate"; o Node já usa `NODE_EXTRA_CA_CERTS=~/cato-ca.cer`. Para downloads com `curl`, usar `CURL_CA_BUNDLE` apontando para o bundle do sistema + `~/cato-ca.cer`. Na S4, builds Docker que baixam pacotes podem precisar do mesmo tratamento.
+- **Em aberto:** `verify_origin` ainda não tem rota POST para ser exercitado (fica coberto pelos testes de API da S2). `gh` não instalado (opcional, só para `just deploy-rollback`).
+- **Próximo passo:** S2, começando pela T-07 (ports `Clock`/`PasswordHasher`, adapters e fakes).
