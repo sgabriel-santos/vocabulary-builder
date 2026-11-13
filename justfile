@@ -19,3 +19,7 @@ db-up:
 # Para os containers do ambiente local (mantém o volume)
 db-down:
     docker compose down
+
+# API com reload (porta API_PORT, padrão 8000)
+dev-backend:
+    cd backend && uv run uvicorn app.main:create_app --factory --reload --port ${API_PORT:-8000}
