@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 
+import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 import { Toaster } from "@/components/ui/sonner";
 
 export interface RouterContext {
@@ -16,6 +17,7 @@ function RootLayout() {
     <>
       <Outlet />
       <Toaster />
+      <PwaUpdatePrompt />
     </>
   );
 }
