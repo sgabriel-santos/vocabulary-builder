@@ -1,0 +1,37 @@
+# TLS no Caddy do host (ADR 0013)
+{
+	auto_https off
+	servers {
+		# Preserva o X-Forwarded-For do Caddy do host (rate limit de login por IP real)
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "microphone=(self), camera=()"
+		-Server
+	}
+
+	# `header` roda antes do try_files: `path /index.html` não pegaria as navegações da SPA.
+	# `?` preserva o Cache-Control vindo da api.
+	@immutable path /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	@revalidate not path /assets/*
+	header @revalidate ?Cache-Control "no-cache"
+}

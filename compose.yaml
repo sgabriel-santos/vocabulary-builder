@@ -1,0 +1,23 @@
+# Ambiente de desenvolvimento: apenas o Postgres.
+# Produção usa deploy/compose.prod.yaml.
+services:
+  db:
+    image: postgres:18.7-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      # Porta do host configurável (POSTGRES_PORT) para conviver com outros Postgres locais
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Postgres 18+: montar em /var/lib/postgresql (não em /var/lib/postgresql/data)
+      - db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db_data:

@@ -1,0 +1,5 @@
+src/routeTree.gen.ts
+src/api/schema.d.ts
+dist
+dev-dist
+pnpm-lock.yaml

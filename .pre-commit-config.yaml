@@ -1,0 +1,52 @@
+# Hooks rápidos executados a cada commit (spec §9.2). Instalação: `just setup`.
+# Rodar em tudo: `uvx pre-commit run --all-files`.
+# Arquivos gerados ficam de fora dos fixers (são reescritos pelos geradores).
+exclude: ^frontend/src/(routeTree\.gen\.ts|api/schema\.d\.ts)$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+        # O lockfile do pnpm 12 tem vários documentos YAML (e é gerado)
+        exclude: ^frontend/pnpm-lock\.yaml$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Mesma versão do ruff fixada no backend/uv.lock
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.5
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  # ESLint e Prettier do próprio frontend (mesmas versões e configs do pnpm-lock).
+  # Os caminhos chegam relativos à raiz; o script remove o prefixo "frontend/".
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js)$
+        entry: >-
+          bash -c 'pnpm --dir frontend exec eslint --no-warn-ignored "${@#frontend/}"' --
+      - id: prettier
+        name: prettier (frontend)
+        language: system
+        files: ^frontend/
+        types: [text]
+        entry: >-
+          bash -c 'pnpm --dir frontend exec prettier --write --ignore-unknown "${@#frontend/}"' --
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

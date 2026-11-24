@@ -812,34 +812,34 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 
 | Sessão | Tarefa | Descrição | Status | Commit |
 |---|---|---|---|---|
-| S1 | T-01 | Ferramentas locais (manual) | ⬜ | |
-| S1 | T-02 | Base do repositório | ⬜ | |
-| S1 | T-03 | Projeto Python | ⬜ | |
-| S1 | T-04 | Config, logging, app | ⬜ | |
-| S1 | T-05 | Base ORM, engine, health | ⬜ | |
-| S1 | T-06 | Modelos e migração inicial | ⬜ | |
-| S2 | T-07 | Ports, adapters e fakes | ⬜ | |
-| S2 | T-08 | Domínio de auth + testes unitários | ⬜ | |
-| S2 | T-09 | Casos de uso de auth | ⬜ | |
-| S2 | T-10 | Camada HTTP de auth | ⬜ | |
-| S2 | T-11 | CLI create-user e seed-dev | ⬜ | |
-| S2 | T-12 | Exportação do OpenAPI | ⬜ | |
-| S2 | T-13 | Fixtures de teste | ⬜ | |
-| S2 | T-14 | Testes de integração e API | ⬜ | |
-| S3 | T-15 | Projeto frontend e ferramentas | ⬜ | |
-| S3 | T-16 | Client da API | ⬜ | |
-| S3 | T-17 | Router e rotas | ⬜ | |
-| S3 | T-18 | Telas e features | ⬜ | |
-| S3 | T-19 | PWA | ⬜ | |
-| S3 | T-20 | Testes de frontend | ⬜ | |
-| S4 | T-21 | Pre-commit | ⬜ | |
-| S4 | T-22 | CI | ⬜ | |
-| S4 | T-23 | Imagem api | ⬜ | |
-| S4 | T-24 | Imagem web e Caddyfile | ⬜ | |
-| S4 | T-25 | Compose de produção, deploy.sh, runbook | ⬜ | |
-| S5 | T-26 | Configuração do VPS (manual) | ⬜ | |
-| S5 | T-27 | Environment do GitHub (manual) | ⬜ | |
-| S5 | T-28 | deploy.yml e Dependabot | ⬜ | |
+| S1 | T-01 | Ferramentas locais (manual) | ✅ | — (manual) |
+| S1 | T-02 | Base do repositório | ✅ | `b701a15` |
+| S1 | T-03 | Projeto Python | ✅ | `1266344` |
+| S1 | T-04 | Config, logging, app | ✅ | `13012a8` |
+| S1 | T-05 | Base ORM, engine, health | ✅ | `13012a8` |
+| S1 | T-06 | Modelos e migração inicial | ✅ | commit final da S1 |
+| S2 | T-07 | Ports, adapters e fakes | ✅ | `6dd412b` |
+| S2 | T-08 | Domínio de auth + testes unitários | ✅ | `6dd412b` |
+| S2 | T-09 | Casos de uso de auth | ✅ | `241dcef` |
+| S2 | T-10 | Camada HTTP de auth | ✅ | `241dcef` |
+| S2 | T-11 | CLI create-user e seed-dev | ✅ | `489fc49` |
+| S2 | T-12 | Exportação do OpenAPI | ✅ | `489fc49` |
+| S2 | T-13 | Fixtures de teste | ✅ | commit final da S2 |
+| S2 | T-14 | Testes de integração e API | ✅ | commit final da S2 |
+| S3 | T-15 | Projeto frontend e ferramentas | ✅ | `f01ada0` |
+| S3 | T-16 | Client da API | ✅ | `2a3e88d` |
+| S3 | T-17 | Router e rotas | ✅ | `2a3e88d` |
+| S3 | T-18 | Telas e features | ✅ | `2a3e88d` |
+| S3 | T-19 | PWA | ✅ | `6fdfb67` |
+| S3 | T-20 | Testes de frontend | ✅ | commit final da S3 |
+| S4 | T-21 | Pre-commit | ✅ | `fd0be84` |
+| S4 | T-22 | CI | ✅ | `b1085b5`, `15d9f48` |
+| S4 | T-23 | Imagem api | ✅ | `9466871` |
+| S4 | T-24 | Imagem web e Caddyfile | ✅ | `9466871` |
+| S4 | T-25 | Compose de produção, deploy.sh, runbook | ✅ | commit final da S4 |
+| S5 | T-26 | Configuração do VPS (manual) | ✅ | — (manual); runbook em `71386b9` |
+| S5 | T-27 | Environment do GitHub (manual) | ✅ | — (manual) |
+| S5 | T-28 | deploy.yml e Dependabot | ✅ | commit da T-28 |
 | S5 | T-29 | PR, merge e primeiro deploy | ⬜ | |
 | S5 | T-30 | Ruleset da main (manual) | ⬜ | |
 | S5 | T-31 | Validação final | ⬜ | |
@@ -855,4 +855,83 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 > - **Em aberto:** problemas conhecidos, verificações que falharam.
 > - **Próximo passo:** primeira ação da próxima sessão.
 
-_(nenhuma sessão executada ainda)_
+**S1 — 2026-11-12**
+- **Concluído:** T-01 a T-06. Marco verificado: `just db-up` (Postgres saudável), `just migrate`, `GET /api/v1/health` → `200 {"status":"ok","database":"ok"}` (e `503` com o banco parado), `alembic downgrade base` sem erro, `alembic check` sem drift, `ruff`/`mypy` verdes.
+- **Desvios do Blueprint:**
+  - **Node padrão do sistema continua 24.18.0** (`nvm alias default 24.18.0`, em vez de `nvm alias default 26`): o Claude Code e outro projeto local (QuickSilver) usam o Node 24 global. O Node 26.13.1 está instalado e é usado só neste projeto (`nvm use` na pasta `frontend/`, via `.nvmrc`). Nas receitas do `just` que chamam o frontend (S3), garantir Node 26 no PATH.
+  - **`POSTGRES_PORT` passou a definir a porta do host no `compose.yaml`** (`127.0.0.1:${POSTGRES_PORT:-5432}:5432`): a 5432 está ocupada pelo Postgres do QuickSilver. O `.env` local usa **5433**; o `.env.example` mantém 5432.
+  - **Nova configuração `API_PORT`** (default 8000; `.env` local **8001**, porque a 8000 é do backend do QuickSilver): usada por `just dev-backend` e por `Settings.allowed_origins` em dev (`http://localhost:{api_port}`). **Na S3, o proxy do Vite deve apontar para `http://localhost:${API_PORT}`**, e o `curl` manual com `Origin` deve usar a porta do `.env`.
+  - `InMemoryRateLimiter` (com `time_func` injetável) criado na T-04, porque o `create_app()` já o instancia; os testes dele seguem na S2.
+  - `just setup` usa `[ -f .env ] || cp .env.example .env` em vez de `cp -n` (o GNU coreutils emite aviso de não-portável). Ainda não roda `pnpm install` (frontend nasce na S3) nem pre-commit (T-21).
+  - `alembic.ini` mantém `script_location = %(here)s/migrations` (padrão do Alembic 1.20, funciona de qualquer diretório) e `migrations/script.py.mako` foi reescrito com tipos modernos (`str | None`, `collections.abc`) para passar no ruff.
+  - O `README.md` foi criado e entrou no commit da T-06 (em vez da T-02), para só citar receitas que já existem.
+- **Versões e decisões práticas:** Python 3.14.7; Node 26.13.1 (LTS Lithium); pnpm 12.18.0 (standalone); just 1.59.0; `postgres:18.7-alpine`; FastAPI 0.162.5, SQLAlchemy 2.1.8, pydantic 2.14.3, pydantic-settings 2.16.2, Alembic 1.20.1, psycopg 3.3.9, structlog 26.1.0, uvicorn 0.54.0, pytest 9.2.0, pytest-asyncio 1.5.0 (opções `asyncio_default_fixture_loop_scope` e `asyncio_default_test_loop_scope`, ambas `session`), mypy 2.4.1, ruff 0.17.5, testcontainers 4.15.0. O parser de dotenv do `just` remove comentários inline do `.env` corretamente. O PostgreSQL 18 registra NOT NULL como constraints nomeadas (`<tabela>_<coluna>_not_null`); não afeta o Alembic. **Rede corporativa com inspeção TLS (Cato Networks):** `curl` falha com "self-signed certificate"; o Node já usa `NODE_EXTRA_CA_CERTS=~/cato-ca.cer`. Para downloads com `curl`, usar `CURL_CA_BUNDLE` apontando para o bundle do sistema + `~/cato-ca.cer`. Na S4, builds Docker que baixam pacotes podem precisar do mesmo tratamento.
+- **Em aberto:** `verify_origin` ainda não tem rota POST para ser exercitado (fica coberto pelos testes de API da S2). `gh` não instalado (opcional, só para `just deploy-rollback`).
+- **Próximo passo:** S2, começando pela T-07 (ports `Clock`/`PasswordHasher`, adapters e fakes).
+
+**S2 — 2026-11-13**
+- **Concluído:** T-07 a T-14. Marco verificado: `just lint-backend`, `just typecheck-backend` e `just test-backend` verdes (33 testes, 0 warnings, cobertura 81%); `just seed` idempotente (e recusado com `APP_ENV=production`); login → `/me` → logout pela API com `curl` na porta 8001 (`Origin: http://localhost:8001`), incluindo `401` genérico, `403` sem `Origin` e `401` com o cookie antigo após o logout.
+- **Desvios do Blueprint:**
+  - **Senha mínima de 8 caracteres** (em vez de 12), a pedido do usuário (`MIN_PASSWORD_LENGTH` em `application/auth/create_user.py`).
+  - Nova exceção `InvalidUserInput(ValueError)` em `application/auth/errors.py` para e-mail/senha fora das regras (a 2.8 não nomeava o erro de validação).
+  - `DUMMY_HASH` cacheado **por tipo de hasher** (`dict[type, str]`), para não verificar um hash fake com o Argon2 (ou o contrário) quando ambos existem no mesmo processo.
+  - `test_settings` fixa `api_port=8000` (e os demais campos de sessão): o `just` exporta o `.env` local (`API_PORT=8001`) e o `Origin` do client de teste deixaria de ser aceito.
+  - `logout` usa `delete_cookie` com os mesmos atributos do `set_cookie` (`httponly`, `secure`, `samesite`).
+  - Testes além da lista da 4.2–4.4: `tests/unit/test_argon2_hasher.py` (adapter real), `tests/integration/test_create_user.py` (normalização, mínimo de 8, e-mail inválido, duplicado), `test_logout_without_session_returns_204` e `test_session_is_renewed_after_one_hour` (variação prevista na 3.5).
+  - Receitas agregadas `lint`, `typecheck`, `test` e `format` ainda não existem: dependem do frontend (S3). Por ora há só as `*-backend` e `test-unit/integration/api`.
+- **Versões e decisões práticas:** testcontainers 4.15: importar de `testcontainers.community.postgres` (o caminho `testcontainers.postgres` emite `DeprecationWarning`). SQLAlchemy 2.1: `Row` se desempacota direto (`session, user = row`); `row.tuple()`/`row._tuple()` estão depreciados. httpx: cookies por request (`cookies=...`) estão depreciados; usar `client.cookies.set(...)`. O marker de cada teste vem da pasta (`pytest_collection_modifyitems` no `tests/conftest.py`), então `pytest -m unit` roda sem Docker. Um container `postgres:18.7-alpine` por sessão de testes (~5 s).
+- **Em aberto:** o cookie de sessão tem `Max-Age` fixo de 60 dias a partir do login, enquanto o servidor renova `expires_at` (expiração deslizante). Um usuário ativo terá o cookie expirado no navegador após 60 dias mesmo com a sessão válida no banco. Decidir se o `current_user` deve reemitir o cookie quando a sessão é renovada.
+- **Próximo passo:** S3, começando pela T-15 (projeto Vite). Proxy do Vite para `http://localhost:${API_PORT}` (8001 no `.env` local) e `just gen-client` usando `uv run python -m app.scripts.export_openapi`.
+
+**S3 — 2026-11-13**
+- **Concluído:** T-15 a T-20. Marco verificado: login de ponta a ponta no navegador em `localhost:5173` (validado pelo usuário: redirect para `/login`, login, "API: ok · Banco: ok", e-mail no cabeçalho, "Sair"); o mesmo fluxo por `curl` pelo proxy do Vite (`Origin: http://localhost:5173` aceito pelo backend sem mudanças); `just lint`, `just typecheck` e `just test` verdes (backend: 33 testes, 81%; frontend: 13 testes, sem avisos); `just build-frontend` gera `sw.js` e `manifest.webmanifest` (precache de 29 entradas, nenhuma rota de runtime, `/api/` fora do fallback de navegação).
+- **Desvios do Blueprint:**
+  - **TypeScript fixado em `~6.0.3`** (decisão do usuário): o `create-vite` 9.3 já vem com TypeScript 7 (nativo) e oxlint, mas o `typescript-eslint` 8.72 aceita só `<6.1` e o `openapi-typescript` 7.13 declara `^5.x`. O oxlint foi removido para seguir a spec (ESLint flat). Revisitar quando o `typescript-eslint` suportar o TS 7.
+  - **Node 26 via `devEngines.runtime`** no `package.json` (`onFail: "download"`): o pnpm baixa o Node 26.13.1 para o `node_modules` e roda scripts/`exec` com ele, mesmo com o Node 24 como padrão do sistema. As receitas do `just` não usam nvm. O `.nvmrc` continua (CI e editor).
+  - **`libatomic1`** instalada no WSL: o binário do Node 26 depende dela e o Ubuntu 24.04 do WSL não a traz (o Node 26 da S1 nunca tinha chegado a rodar). Documentado no README.
+  - **Proxy do Vite lê `API_PORT`** do `.env` da raiz (`loadEnv`), em vez de fixar `localhost:8000`. `server.strictPort: true`.
+  - **shadcn 4.23** (`-b base -p nova` → estilo `base-nova`, Base UI): `cn()` vem do pacote oficial `cn` (substitui `clsx` + `tailwind-merge`); fonte Geist via `@fontsource-variable/geist`.
+  - **`ApiError(status, body)`**: o `openapi-react-query` lança só o corpo do erro, sem o status. Um middleware do `fetchClient` lança `ApiError` em toda resposta não-2xx; `isUnauthorized`, `LoginForm` e `HealthStatus` usam `error.status`. O redirect por 401 é um handler registrado pelo `router.ts` (`setUnauthorizedHandler`), evitando import circular `client.ts` ↔ `router.ts`.
+  - **`fetch: (request) => globalThis.fetch(request)`** no `createFetchClient`: o `openapi-fetch` captura o `fetch` na criação do client, antes do `server.listen()` do MSW. Sem isso, os testes iam para a rede de verdade (no caso, o `just dev` aberto) em vez dos handlers.
+  - **MSW 3**: a opção do `listen()` agora é `onUnhandledFrame: "error"` (era `onUnhandledRequest`). Respostas cujo corpo não está no OpenAPI (401/429 do FastAPI) usam `response.untyped(...)` no openapi-msw. `msw/node` fica em `src/test/server.ts`.
+  - **TanStack Query 5.107**: `ensureQueryData` está depreciado; o `_authenticated` usa `queryClient.query({ ...meQueryOptions(), staleTime: "static" })` (mesma semântica).
+  - **React 19.3**: `FormEvent` depreciado; o `LoginForm` usa `SubmitEvent`.
+  - **ESLint**: `react-refresh/only-export-components` desligada em `src/routes/` (arquivos de rota só exportam `Route`; o HMR deles é do plugin do router). `typescript-eslint` com `strictTypeChecked` + `stylisticTypeChecked`. `redirect` do TanStack Router lançado com `eslint-disable-next-line @typescript-eslint/only-throw-error`.
+  - **Prettier** com `printWidth: 100`.
+  - **`routeTree.gen.ts` versionado** (gerado pelo plugin no `vite dev`/`vite build`; o `tsc -b` precisa dele).
+  - **`isSafeRedirect`** (`features/auth/safe-redirect.ts`) recusa também `/\` além de `//`; ganhou teste próprio. O `login` e o `beforeLoad` usam `redirect({ href })`/`navigate({ href })`, já que o destino é um caminho livre.
+  - **PWA**: ícone próprio (`favicon.svg` com "V"; o do template era o logo do Vite); o gerador também cria `favicon.ico`; `globPatterns` inclui `ico` e `woff2` (fonte no precache).
+  - **Receitas novas**: `dev`, `dev-frontend`, `build-frontend`, `gen-client` (com `trap` para apagar o temporário), `lint-frontend`, `typecheck-frontend` (`tsc -b`), `test-frontend` e as agregadas `lint`, `typecheck`, `test`, `format`. `just setup` passou a rodar `pnpm install`. `just build` (com Docker) fica para a S4.
+- **Versões e decisões práticas:** create-vite 9.3.4; Vite 8.3; React 19.3; TypeScript 6.0.3; TanStack Router 1.170 (plugin 1.169), TanStack Query 5.107; openapi-fetch 0.17, openapi-react-query 0.5, openapi-typescript 7.13; Tailwind 4.3; shadcn 4.23; vite-plugin-pwa 2.0 (+ `workbox-window`), `@vite-pwa/assets-generator` 2.0; Vitest 5.1, jsdom 31, MSW 3.0, openapi-msw 2.1, Testing Library (React 16.3, jest-dom 7); ESLint 10.14, typescript-eslint 8.72, react-hooks 7.1, react-refresh 0.5; Prettier 3.10; `@types/node` 26. Vitest 5 esconde `console.log` de testes que passam (usar `--silent=false` para depurar).
+- **Em aberto:** a instalação da PWA no celular só é validável com HTTPS (S5). Continua em aberto o `Max-Age` fixo do cookie (S2). Os componentes de `src/components/ui/` usam `next-themes` (vindo do shadcn) sem `ThemeProvider`; o `useTheme` cai em `"system"`, que é o comportamento desejado por ora.
+- **Próximo passo:** S4, começando pela T-21 (pre-commit). No CI (T-22), o job `frontend` pode usar o Node do `setup-node` (`frontend/.nvmrc`); o `devEngines.runtime` faz o pnpm baixar a mesma versão se divergir. O `contract` roda `just gen-client` e `git diff --exit-code frontend/src/api/`.
+
+**S4 — 2026-11-13**
+- **Concluído:** T-21 a T-25. Marco verificado: `uvx pre-commit run --all-files` verde; CI verde na branch remota (`backend`, `frontend`, `contract`, `secrets`); `just build` gera `vocab-api:local` (307 MB) e `vocab-web:local` (93 MB); `docker compose -f deploy/compose.prod.yaml config` válido com variáveis fictícias. Além do marco: a stack de produção subiu localmente (cópia de `deploy/` com `.env` de produção fictício, portas remapeadas e `APP_DOMAIN=localhost` com a CA interna do Caddy): `migrate` aplicou a `0001` e saiu com 0; `create-user` via `run --rm api`; login → `/me` por HTTPS pelo Caddy, com cookie `Secure` e HSTS; fallback da SPA; HTTP → 308 para HTTPS; o uvicorn usa o IP do `X-Forwarded-For`.
+- **Desvios do Blueprint:**
+  - **Caddyfile, cache do `index.html`:** o `header` roda antes do `try_files`, então `@sw path /sw.js /index.html /manifest.webmanifest` não pegava as navegações da SPA (`/`, `/login`), que voltavam sem `Cache-Control`. Agora `@revalidate not path /assets/*` + `header @revalidate ?Cache-Control "no-cache"` (o `?` preserva o header da `api`, se houver). Spec §11.2 atualizada.
+  - **Permissão do secret:** sem Swarm, o secret do Compose é um bind mount que preserva dono e modo do host, e a `api` roda como uid 1000. Com `chmod 600` e dono `deploy`, a leitura só funciona se o `deploy` tiver uid 1000. Regra adotada: `secrets/` com `chmod 700` e dono `deploy`; `postgres_password` com `chmod 444`. Spec §5.4 e §11.6 e runbook atualizados.
+  - **`check-yaml` exclui `frontend/pnpm-lock.yaml`:** o lockfile do pnpm 12 tem vários documentos YAML. Os arquivos gerados (`routeTree.gen.ts`, `schema.d.ts`) ficam fora de todos os hooks.
+  - **Hooks do frontend:** dois hooks locais (`eslint --no-warn-ignored` e `prettier --write --ignore-unknown`), com o prefixo `frontend/` removido dos caminhos por `bash -c '... "${@#frontend/}"' --`.
+  - **`astral-sh/setup-uv@v10.3.3`:** a action não publica tag maior flutuante (`@v10` quebrou o primeiro run). As demais usam tag maior (`checkout@v7`, `setup-node@v7`, `pnpm/action-setup@v6`, `extractions/setup-just@v4`, `upload-artifact@v7`, `gitleaks-action@v3`).
+  - **CI:** `concurrency` cancela runs antigos fora da `main`; o job `secrets` tem `pull-requests: read` (a action lista os commits do PR) e `GITLEAKS_ENABLE_COMMENTS: false`; a cobertura sobe como artefato `backend-coverage`; `persist-credentials: false` nos checkouts.
+  - **`deploy.sh`:** o `docker logout` fica num `trap EXIT` (cobre sucesso e falha); `APP_DOMAIN` é lido do `.env` com `grep` (sem `source`); a limpeza de imagens usa `docker image ls ... | sort -r | tail -n +3`.
+  - `backend/Dockerfile` copia também o `.python-version`; `frontend/.dockerignore` ignora ainda `.tanstack/`, `Dockerfile` e `.dockerignore`.
+  - **Receita `just build`** adicionada. **`just deploy-rollback`** fica para a S5, junto com o `deploy.yml` que ela dispara (o runbook já a cita).
+- **Versões e decisões práticas:** `python:3.14.10-slim`, `ghcr.io/astral-sh/uv:0.12.13`, `node:26.13.1-slim` (pnpm 12.18.0 via `npm install -g`), `caddy:2.11.9-alpine`, `postgres:18.7-alpine`; pre-commit 4.7.0 com pre-commit-hooks v6.0.0, ruff-pre-commit v0.17.5 e gitleaks v8.30.1 (a mesma versão no CI, via `GITLEAKS_VERSION`); Docker Compose v5.1.3 (aceita `!override` em arquivos de override). O build das imagens funcionou através do proxy TLS da Cato sem ajustes (houve só um timeout passageiro do npm, que se recuperou sozinho). O repositório é **privado**: a API pública do GitHub responde 404 e o status do CI é conferido pela interface web (ou com `gh`, ainda não instalado).
+- **Em aberto:** a permissão `444` do secret foi validada só com uid 1000 local; confirmar no VPS (S5) que a `api` lê `/run/secrets/postgres_password` com o uid real do `deploy`. Continuam em aberto o `Max-Age` fixo do cookie (S2) e a validação da PWA no celular (S5).
+- **Próximo passo:** S5. T-26 (VPS, seguindo `deploy/README.md` §1) e T-27 (Environment `production`, §2) são manuais. Depois, a T-28 (`deploy.yml` + `dependabot.yml` + receita `deploy-rollback`).
+
+**S5 — 2026-11-23 (em andamento)**
+- **Concluído até agora:** T-26 e T-27 (manuais, validados pelo usuário) e T-28 (validada com actionlint; a validação real é o primeiro deploy, na T-29). O DNS `vocab.gbs-software.com.br` resolve para a VPS. O certificado Let's Encrypt foi emitido pelo Caddy do host, e o domínio responde `502` até o primeiro deploy, como esperado. As stacks do GBS seguiram no ar. O SSH com a chave `vocab-deploy` funciona como `deploy`, com o grupo `docker`. A fingerprint do `ssh-keyscan` confere com a do host. Environment `production` criado (só `main`), com `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` e a variável `APP_DOMAIN`. O plano do GitHub suporta Environments em repositório privado.
+- **Desvios do Blueprint:**
+  - **VPS compartilhada com o GBS Ops Flow** (Ubuntu 26.04, operada como `root`, Docker e Caddy já instalados). O Caddy do host já ocupava as portas 80/443. **ADR 0013** (`71386b9`): o TLS fica com o Caddy do host, e o `web` atende só HTTP em `127.0.0.1:9001` (`auto_https off`, `trusted_proxies static private_ranges`). O compose ganhou `name: vocab` e perdeu os volumes `caddy_data`/`caddy_config`. Validado localmente com um Caddy simulando o do host: login por HTTPS, cookie `Secure`, IP real chegando à `api` e `X-Forwarded-For` forjado ignorado. Spec (§1.4, §11.2, §11.4, §11.6), ADR 0001, `AGENTS.md`, overview e runbook atualizados. Isso substitui os itens 1–3 e 6 da T-26 na seção 5.
+  - **Domínio:** `vocab.gbs-software.com.br` (zona já existente no Registro.br).
+  - **Hardening da VPS fora do escopo** (decisão do usuário): firewall e SSH são pendências do guia da VPS compartilhada, fora do runbook do vocab.
+  - O registro no guia da VPS (`GUIA-VPS.md`, fora do repositório) contém só o estado da máquina, nada do fluxo do projeto.
+  - Nova convenção no `AGENTS.md` (`b262995`): só comentários estritamente necessários.
+  - **`deploy.yml`:** `build-and-push` usa uma `matrix` (`vocab-api`/`backend`, `vocab-web`/`frontend`), em vez de dois passos no mesmo job: as imagens são construídas em paralelo, com `scope` de cache próprio. O job `ci` repassa `pull-requests: read`, porque o reusable workflow só recebe permissões que o chamador concede, e o job `secrets` do `ci.yml` precisa dela. Há `permissions: {}` no topo, e cada job declara as suas. O `deploy` usa `!cancelled()` em vez de `always()`, para não implantar um run cancelado. Os secrets chegam aos passos por `env` e nunca interpolados no script. O SSH usa um alias `vps` em `~/.ssh/config` com `StrictHostKeyChecking yes`.
+  - **`dependabot.yml`:** prefixos de commit no padrão Conventional Commits (`ci` para actions; `build(deps)` para os demais). Na imagem `python`, ignora atualizações minor e major (3.15 bloqueado pelo spaCy, ADR 0004). Na `node`, ignora major (só LTS, ADR 0005). O compose de produção (`postgres`) fica fora, como na spec: um salto de major do Postgres exige dump/restore.
+- **Versões e decisões práticas:** `docker/setup-buildx-action@v4`, `docker/login-action@v4`, `docker/build-push-action@v7`. A receita `just deploy-rollback <sha>` requer o `gh` autenticado, que ainda não está instalado localmente; a alternativa é a UI (Actions → Deploy → Run workflow). Porta `9001` reservada para o vocab (faixa 9001+ do guia da VPS). Docker Engine 29.10 e Compose v5.7.1 na VPS. Caddy do host 2.11.9. O backup do Caddyfile anterior ficou em `/etc/caddy/Caddyfile.bak-<data>`.
+- **Em aberto:** confirmar no primeiro deploy que a `api` lê `/run/secrets/postgres_password` (`444`) com o uid real do `deploy`. Continuam em aberto o `Max-Age` fixo do cookie (S2) e a PWA no celular (T-31).
+- **Próximo passo:** T-29: push da branch, PR da E0 com CI verde, squash merge e acompanhamento do primeiro deploy. Depois, `create-user` na VPS.

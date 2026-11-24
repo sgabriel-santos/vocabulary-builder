@@ -1,6 +1,6 @@
 # 0001 — Hospedagem em VPS com Docker Compose e Caddy
 
-- **Status:** Aceita
+- **Status:** Aceita; o item do Caddy foi substituído pelo [0013](0013-shared-edge-caddy-on-host.md)
 - **Data:** 2026-11-12
 - **Resolve:** questão em aberto q3 (overview §15)
 
@@ -12,7 +12,7 @@ O deploy em produção acontece desde a E0 (delivery plan). O host precisa acomo
 
 - **VPS Hostinger KVM 2** (2 vCPU / 8 GB / 100 GB NVMe), data center no Brasil, contrato de 24 meses. Ubuntu 24.04 LTS sem painel.
 - **Docker Compose** orquestra todos os serviços.
-- **Caddy dentro do compose do projeto**: único serviço com portas publicadas, HTTPS automático (Let's Encrypt), serve o build do SPA e faz proxy de `/api/*` para a API. Frontend e API na **mesma origem** (`vocab.<domínio>`).
+- ~~**Caddy dentro do compose do projeto**~~ (substituído pelo [ADR 0013](0013-shared-edge-caddy-on-host.md): o TLS ficou com um Caddy de borda no host, compartilhado com outras aplicações da VPS): único serviço com portas publicadas, HTTPS automático (Let's Encrypt), serve o build do SPA e faz proxy de `/api/*` para a API. Frontend e API na **mesma origem** (`vocab.<domínio>`).
 - Domínio registrado no Registro.br, com o DNS do próprio Registro.br.
 
 ## Consequências

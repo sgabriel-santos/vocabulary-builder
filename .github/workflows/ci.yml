@@ -1,0 +1,130 @@
+# Lint, tipos, testes, drift do contrato e gitleaks (spec §12.1).
+# Os jobs chamam as receitas do justfile: o CI executa o mesmo que o dev executa localmente.
+# Reutilizado pelo deploy.yml via workflow_call.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+# Em PRs/branches, um push novo cancela o run anterior; na main (via deploy.yml) nunca cancela
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  UV_VERSION: "0.12.13"
+  JUST_VERSION: "1.59.0"
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.3 # sem tag maior flutuante: fixar a versão completa
+        with:
+          version: ${{ env.UV_VERSION }}
+          working-directory: backend
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: ${{ env.JUST_VERSION }}
+      - run: uv sync --frozen
+      - run: just lint-backend
+      - run: just typecheck-backend
+      # testcontainers usa o Docker do runner
+      - run: just test-backend
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Versão do pnpm vem do "packageManager" do frontend/package.json
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: ${{ env.JUST_VERSION }}
+      - run: pnpm --dir frontend install --frozen-lockfile
+      - run: just lint-frontend
+      - run: just typecheck-frontend
+      - run: just test-frontend
+      - run: just build-frontend
+
+  # Falha se o client gerado (frontend/src/api/) estiver desatualizado em relação à API
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.3 # sem tag maior flutuante: fixar a versão completa
+        with:
+          version: ${{ env.UV_VERSION }}
+          working-directory: backend
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: ${{ env.JUST_VERSION }}
+      - run: uv sync --frozen
+        working-directory: backend
+      - run: pnpm --dir frontend install --frozen-lockfile
+      - run: just gen-client
+      - run: git diff --exit-code frontend/src/api/
+
+  secrets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # a action lista os commits do PR
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Mesma versão do hook de pre-commit
+          GITLEAKS_VERSION: "8.30.1"
+          # Sem comentários em PR: o job só precisa de contents: read
+          GITLEAKS_ENABLE_COMMENTS: "false"

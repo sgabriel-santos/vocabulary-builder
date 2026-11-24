@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dev-dist/
+coverage/
+.tanstack/
+.env*
+e2e/
+Dockerfile
+.dockerignore
