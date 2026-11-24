@@ -73,6 +73,7 @@ just --list                # todas as receitas
 - **Git**: branch curta (`feat/F-01-...`, `fix/...`, `chore/...`, `docs/...`) → PR → squash merge na `main`. Nunca push direto na `main`. Commits seguem o `CLAUDE.md` (Conventional Commits em inglês, sem atribuição de IA, aprovação explícita do usuário antes de cada commit).
 - **Banco**: toda mudança de schema por migração Alembic revisada à mão; **prefira** migrações compatíveis com a versão anterior (diretriz, não regra: o rollback é manual e não reverte schema; ver spec §4.4). Timestamps em UTC.
 - **ADRs**: decisões arquiteturais novas viram `docs/adr/NNNN-titulo.md`.
+- **Comentários** (código e configuração): só os estritamente necessários, explicando o *porquê* não óbvio (restrição, workaround, comportamento surpreendente). Não repita o que o código já diz, não narre a mudança nem duplique a documentação; o contexto maior vai para ADRs, spec e runbook.
 
 ## Faça
 
