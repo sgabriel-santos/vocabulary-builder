@@ -840,7 +840,7 @@ Gatilhos: `push` na `main` e `workflow_dispatch` (input `sha`, para reimplantar 
    5. Sucesso → grava `current_tag=<sha>`, `docker image prune` de imagens antigas (mantendo as duas mais recentes), `docker logout`.
    6. Falha → sai com erro (job vermelho) e **não** grava `current_tag`. Não há rollback automático: projeto single-user, alguns minutos fora do ar são aceitáveis.
 
-**Secrets do Environment `production`**: `DEPLOY_HOST`, `DEPLOY_USER` (`deploy`), `DEPLOY_SSH_KEY` (chave privada exclusiva do deploy), `DEPLOY_KNOWN_HOSTS`. Variável: `APP_DOMAIN`.
+**Secrets do Environment `production`**: `DEPLOY_HOST`, `DEPLOY_SSH_KEY` (chave privada exclusiva do deploy), `DEPLOY_KNOWN_HOSTS`. Variáveis: `APP_DOMAIN`, `DEPLOY_USER` (`deploy`; como secret, toda ocorrência de "deploy" nos logs seria mascarada).
 
 **Proteção da chave de deploy**: o usuário `deploy` está no grupo `docker` e recebe o compose do CI, então a chave vazada equivale a acesso root ao VPS. Por isso o Environment `production` tem *deployment branch rule* restrita à `main` (workflows de PRs e outras branches não acessam a chave), a chave é exclusiva do deploy e revogável a qualquer momento removendo-a do `authorized_keys`.
 

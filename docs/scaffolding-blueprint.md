@@ -840,7 +840,7 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 | S5 | T-26 | Configuração do VPS (manual) | ✅ | — (manual); runbook em `71386b9` |
 | S5 | T-27 | Environment do GitHub (manual) | ✅ | — (manual) |
 | S5 | T-28 | deploy.yml e Dependabot | ✅ | commit da T-28 |
-| S5 | T-29 | PR, merge e primeiro deploy | ⬜ | |
+| S5 | T-29 | PR, merge e primeiro deploy | ✅ | `fab790c` (PR #2) |
 | S5 | T-30 | Ruleset da main (manual) | ⬜ | |
 | S5 | T-31 | Validação final | ⬜ | |
 
@@ -934,4 +934,6 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
   - **`dependabot.yml`:** prefixos de commit no padrão Conventional Commits (`ci` para actions; `build(deps)` para os demais). Na imagem `python`, ignora atualizações minor e major (3.15 bloqueado pelo spaCy, ADR 0004). Na `node`, ignora major (só LTS, ADR 0005). O compose de produção (`postgres`) fica fora, como na spec: um salto de major do Postgres exige dump/restore.
 - **Versões e decisões práticas:** `docker/setup-buildx-action@v4`, `docker/login-action@v4`, `docker/build-push-action@v7`. A receita `just deploy-rollback <sha>` requer o `gh` autenticado, que ainda não está instalado localmente; a alternativa é a UI (Actions → Deploy → Run workflow). Porta `9001` reservada para o vocab (faixa 9001+ do guia da VPS). Docker Engine 29.10 e Compose v5.7.1 na VPS. Caddy do host 2.11.9. O backup do Caddyfile anterior ficou em `/etc/caddy/Caddyfile.bak-<data>`.
 - **Em aberto:** confirmar no primeiro deploy que a `api` lê `/run/secrets/postgres_password` (`444`) com o uid real do `deploy`. Continuam em aberto o `Max-Age` fixo do cookie (S2) e a PWA no celular (T-31).
-- **Próximo passo:** T-29: push da branch, PR da E0 com CI verde, squash merge e acompanhamento do primeiro deploy. Depois, `create-user` na VPS.
+- **T-29 concluída:** PR #2 com CI verde e squash merge (`fab790c`). O primeiro `deploy.yml` passou (`ci` → `build-and-push` em paralelo → `deploy` em 36 s; o smoke test passou na 2ª tentativa, com a api ainda iniciando). Conferido de fora: `/api/v1/health` → `{"status":"ok","database":"ok"}`, o que confirma que a `api` lê o secret `444` com o uid real do `deploy`; `/login` com HSTS e `no-cache`; HTTP → `308`. Usuário real criado com `create-user`, e o login em produção foi validado pelo usuário.
+- **Ajustes após o primeiro deploy** (PR seguinte, que também serve de "PR trivial" da T-31): `cache-dependency-glob: uv.lock` no `ci.yml` (o caminho é relativo ao `working-directory: backend`; com `backend/uv.lock` o cache nunca invalidava). `DEPLOY_USER` passou de secret a variável do Environment: o GitHub mascarava como `***` toda ocorrência de "deploy" nos logs.
+- **Próximo passo:** T-30 (ruleset da `main`) e T-31 (PWA no celular, deploy por PR trivial, rollback, E0 concluída no `delivery-plan.md`).
