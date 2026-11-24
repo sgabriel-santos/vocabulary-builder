@@ -43,6 +43,10 @@ build: build-frontend
     docker build -t vocab-api:local backend
     docker build -t vocab-web:local frontend
 
+# Reimplanta em produção uma versão já publicada no GHCR (dispara o deploy.yml; requer gh autenticado)
+deploy-rollback sha:
+    gh workflow run deploy.yml --ref main -f sha={{sha}}
+
 # Aplica as migrações no banco local
 migrate:
     cd backend && uv run alembic upgrade head

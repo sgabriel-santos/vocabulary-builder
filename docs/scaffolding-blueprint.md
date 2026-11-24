@@ -837,9 +837,9 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 | S4 | T-23 | Imagem api | ✅ | `9466871` |
 | S4 | T-24 | Imagem web e Caddyfile | ✅ | `9466871` |
 | S4 | T-25 | Compose de produção, deploy.sh, runbook | ✅ | commit final da S4 |
-| S5 | T-26 | Configuração do VPS (manual) | ⬜ | |
-| S5 | T-27 | Environment do GitHub (manual) | ⬜ | |
-| S5 | T-28 | deploy.yml e Dependabot | ⬜ | |
+| S5 | T-26 | Configuração do VPS (manual) | ✅ | — (manual); runbook em `71386b9` |
+| S5 | T-27 | Environment do GitHub (manual) | ✅ | — (manual) |
+| S5 | T-28 | deploy.yml e Dependabot | ✅ | commit da T-28 |
 | S5 | T-29 | PR, merge e primeiro deploy | ⬜ | |
 | S5 | T-30 | Ruleset da main (manual) | ⬜ | |
 | S5 | T-31 | Validação final | ⬜ | |
@@ -921,3 +921,17 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 - **Versões e decisões práticas:** `python:3.14.10-slim`, `ghcr.io/astral-sh/uv:0.12.13`, `node:26.13.1-slim` (pnpm 12.18.0 via `npm install -g`), `caddy:2.11.9-alpine`, `postgres:18.7-alpine`; pre-commit 4.7.0 com pre-commit-hooks v6.0.0, ruff-pre-commit v0.17.5 e gitleaks v8.30.1 (a mesma versão no CI, via `GITLEAKS_VERSION`); Docker Compose v5.1.3 (aceita `!override` em arquivos de override). O build das imagens funcionou através do proxy TLS da Cato sem ajustes (houve só um timeout passageiro do npm, que se recuperou sozinho). O repositório é **privado**: a API pública do GitHub responde 404 e o status do CI é conferido pela interface web (ou com `gh`, ainda não instalado).
 - **Em aberto:** a permissão `444` do secret foi validada só com uid 1000 local; confirmar no VPS (S5) que a `api` lê `/run/secrets/postgres_password` com o uid real do `deploy`. Continuam em aberto o `Max-Age` fixo do cookie (S2) e a validação da PWA no celular (S5).
 - **Próximo passo:** S5. T-26 (VPS, seguindo `deploy/README.md` §1) e T-27 (Environment `production`, §2) são manuais. Depois, a T-28 (`deploy.yml` + `dependabot.yml` + receita `deploy-rollback`).
+
+**S5 — 2026-11-23 (em andamento)**
+- **Concluído até agora:** T-26 e T-27 (manuais, validados pelo usuário) e T-28 (validada com actionlint; a validação real é o primeiro deploy, na T-29). O DNS `vocab.gbs-software.com.br` resolve para a VPS. O certificado Let's Encrypt foi emitido pelo Caddy do host, e o domínio responde `502` até o primeiro deploy, como esperado. As stacks do GBS seguiram no ar. O SSH com a chave `vocab-deploy` funciona como `deploy`, com o grupo `docker`. A fingerprint do `ssh-keyscan` confere com a do host. Environment `production` criado (só `main`), com `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` e a variável `APP_DOMAIN`. O plano do GitHub suporta Environments em repositório privado.
+- **Desvios do Blueprint:**
+  - **VPS compartilhada com o GBS Ops Flow** (Ubuntu 26.04, operada como `root`, Docker e Caddy já instalados). O Caddy do host já ocupava as portas 80/443. **ADR 0013** (`71386b9`): o TLS fica com o Caddy do host, e o `web` atende só HTTP em `127.0.0.1:9001` (`auto_https off`, `trusted_proxies static private_ranges`). O compose ganhou `name: vocab` e perdeu os volumes `caddy_data`/`caddy_config`. Validado localmente com um Caddy simulando o do host: login por HTTPS, cookie `Secure`, IP real chegando à `api` e `X-Forwarded-For` forjado ignorado. Spec (§1.4, §11.2, §11.4, §11.6), ADR 0001, `AGENTS.md`, overview e runbook atualizados. Isso substitui os itens 1–3 e 6 da T-26 na seção 5.
+  - **Domínio:** `vocab.gbs-software.com.br` (zona já existente no Registro.br).
+  - **Hardening da VPS fora do escopo** (decisão do usuário): firewall e SSH são pendências do guia da VPS compartilhada, fora do runbook do vocab.
+  - O registro no guia da VPS (`GUIA-VPS.md`, fora do repositório) contém só o estado da máquina, nada do fluxo do projeto.
+  - Nova convenção no `AGENTS.md` (`b262995`): só comentários estritamente necessários.
+  - **`deploy.yml`:** `build-and-push` usa uma `matrix` (`vocab-api`/`backend`, `vocab-web`/`frontend`), em vez de dois passos no mesmo job: as imagens são construídas em paralelo, com `scope` de cache próprio. O job `ci` repassa `pull-requests: read`, porque o reusable workflow só recebe permissões que o chamador concede, e o job `secrets` do `ci.yml` precisa dela. Há `permissions: {}` no topo, e cada job declara as suas. O `deploy` usa `!cancelled()` em vez de `always()`, para não implantar um run cancelado. Os secrets chegam aos passos por `env` e nunca interpolados no script. O SSH usa um alias `vps` em `~/.ssh/config` com `StrictHostKeyChecking yes`.
+  - **`dependabot.yml`:** prefixos de commit no padrão Conventional Commits (`ci` para actions; `build(deps)` para os demais). Na imagem `python`, ignora atualizações minor e major (3.15 bloqueado pelo spaCy, ADR 0004). Na `node`, ignora major (só LTS, ADR 0005). O compose de produção (`postgres`) fica fora, como na spec: um salto de major do Postgres exige dump/restore.
+- **Versões e decisões práticas:** `docker/setup-buildx-action@v4`, `docker/login-action@v4`, `docker/build-push-action@v7`. A receita `just deploy-rollback <sha>` requer o `gh` autenticado, que ainda não está instalado localmente; a alternativa é a UI (Actions → Deploy → Run workflow). Porta `9001` reservada para o vocab (faixa 9001+ do guia da VPS). Docker Engine 29.10 e Compose v5.7.1 na VPS. Caddy do host 2.11.9. O backup do Caddyfile anterior ficou em `/etc/caddy/Caddyfile.bak-<data>`.
+- **Em aberto:** confirmar no primeiro deploy que a `api` lê `/run/secrets/postgres_password` (`444`) com o uid real do `deploy`. Continuam em aberto o `Max-Age` fixo do cookie (S2) e a PWA no celular (T-31).
+- **Próximo passo:** T-29: push da branch, PR da E0 com CI verde, squash merge e acompanhamento do primeiro deploy. Depois, `create-user` na VPS.
