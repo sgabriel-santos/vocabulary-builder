@@ -95,7 +95,7 @@ just --list                # todas as receitas
 - Não armazene tokens de autenticação no `localStorage`/`sessionStorage`; a sessão é um cookie `HttpOnly` gerenciado pelo backend.
 - Não exponha modelos SQLAlchemy na camada `api/` nem retorne-os diretamente.
 - Não edite à mão arquivos gerados: `frontend/src/routeTree.gen.ts`, `frontend/src/api/schema.d.ts`.
-- Não publique portas de serviços além do `web` (Caddy) no compose de produção; não monte `/var/run/docker.sock` em containers.
+- Não publique portas de serviços além do `web` no compose de produção, e só em `127.0.0.1:9001` (o TLS é do Caddy do host, ADR 0013); não monte `/var/run/docker.sock` em containers.
 - Não use tags `latest` de imagens.
 - Não adicione cache de `/api/*` no service worker (offline está fora do escopo).
 - Não introduza infraestrutura ou abstrações sem um problema real presente (projeto pessoal, single-user).
@@ -116,5 +116,6 @@ just --list                # todas as receitas
 | Imagens `api` e `web`; compose dev/prod separados; migração one-off | Uma imagem para API/migrate/CLI/worker; deploy seguro | [0010](docs/adr/0010-docker-images-and-compose-layout.md) |
 | Deploy automático na `main` com smoke test; rollback manual | `main` = produção; sem o custo de expand/contract obrigatório | [0011](docs/adr/0011-ci-cd-auto-deploy-with-rollback.md) |
 | PR + squash merge; `main` protegida | `main` sempre verde; PR como ponto de revisão | [0012](docs/adr/0012-branching-pr-squash-merge.md) |
+| TLS no Caddy do host (borda compartilhada da VPS); `web` só HTTP em `127.0.0.1:9001` | A VPS hospeda outras aplicações; o Caddy do host já ocupa 80/443 | [0013](docs/adr/0013-shared-edge-caddy-on-host.md) |
 
 Se uma dessas decisões parecer inadequada para uma tarefa, **pare e consulte o usuário** em vez de contorná-la.

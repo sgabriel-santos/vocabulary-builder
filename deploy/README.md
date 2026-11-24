@@ -1,14 +1,27 @@
 # Runbook de produção
 
-Tudo que roda no VPS (Hostinger KVM 2, Ubuntu 24.04). Decisões: [ADR 0001](../docs/adr/0001-hosting-vps-compose-caddy.md) (VPS + Compose + Caddy), [0002](../docs/adr/0002-postgres-on-vps-with-offsite-backup.md) (Postgres e backup), [0010](../docs/adr/0010-docker-images-and-compose-layout.md) (imagens e compose), [0011](../docs/adr/0011-ci-cd-auto-deploy-with-rollback.md) (deploy e rollback).
+Tudo que o Vocabulary Builder roda na VPS. A VPS é **compartilhada** com as stacks do GBS Ops Flow (Ubuntu 26.04, operada como `root`). Sistema, Docker, Caddy do host, firewall, SSH e convenções de porta são descritos no **guia da VPS** (`GUIA-VPS.md`, fora deste repositório). Este runbook cobre só o que é do vocab, seguindo a receita "Outra aplicação" do guia.
+
+Decisões: [ADR 0001](../docs/adr/0001-hosting-vps-compose-caddy.md) (VPS + Compose), [0013](../docs/adr/0013-shared-edge-caddy-on-host.md) (Caddy de borda no host), [0002](../docs/adr/0002-postgres-on-vps-with-offsite-backup.md) (Postgres e backup), [0010](../docs/adr/0010-docker-images-and-compose-layout.md) (imagens e compose), [0011](../docs/adr/0011-ci-cd-auto-deploy-with-rollback.md) (deploy e rollback).
 
 ```
-Internet ──HTTPS──▶ web (Caddy + SPA) :80 :443 :443/udp   ← único serviço com portas
+Internet ──HTTPS──▶ Caddy do host (systemd, :80 :443, Let's Encrypt; compartilhado)
+                     └── vocab.gbs-software.com.br ─▶ 127.0.0.1:9001
+                                                       │
+Projeto compose `vocab`:                               ▼
+                    web (Caddy + SPA, só HTTP :80)   ← único serviço com porta, só em loopback
                      ├── /api/*  → api:8000
                      └── /*      → SPA (fallback index.html)
-                    api ──▶ db (postgres:18, volume db_data)
+                    api ──▶ db (postgres:18, volume vocab_db_data)
                     migrate (one-off: alembic upgrade head, antes da api)
 ```
+
+| Item | Valor |
+|---|---|
+| Domínio | `vocab.gbs-software.com.br` |
+| Porta no host | `127.0.0.1:9001` (faixa 9001+ do guia da VPS) |
+| Diretório | `/opt/vocab` (fora de `/opt/gbs`, que é varrido pelo backup do GBS) |
+| Projeto compose | `vocab` (containers `vocab-<serviço>-1`, rede `vocab_default`, volume `vocab_db_data`) |
 
 ## Layout no VPS
 
@@ -24,38 +37,32 @@ Internet ──HTTPS──▶ web (Caddy + SPA) :80 :443 :443/udp   ← único s
         └── postgres_password        # chmod 444 (ver "Segredos")
 ```
 
-## 1. Setup inicial do VPS (uma vez)
+## 1. Setup inicial na VPS (uma vez)
 
-Execute como o usuário administrativo (com sudo). Substitua `<domínio>` pelo domínio registrado.
+Execute como `root` na VPS (`ssh root@<ip da VPS>`). Docker, Compose, Caddy do host e atualizações automáticas já existem (guia da VPS). Hardening do host (firewall, SSH) é pendência do guia da VPS, fora deste runbook.
 
-### 1.1 Hardening
-
-1. Criar um usuário administrativo com sudo e a sua chave SSH pessoal em `~/.ssh/authorized_keys`. Testar o login com ele **antes** do próximo passo.
-2. Em `/etc/ssh/sshd_config` (ou num arquivo em `/etc/ssh/sshd_config.d/`): `PasswordAuthentication no` e `PermitRootLogin no`; `sudo systemctl restart ssh`.
-3. Firewall (`ufw` ou o firewall do painel da Hostinger), liberando só 22, 80, 443/tcp e 443/udp:
-   ```bash
-   sudo ufw default deny incoming && sudo ufw default allow outgoing
-   sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw allow 443/udp
-   sudo ufw enable
-   ```
-   > O Docker publica portas direto no iptables, por fora do `ufw`. Por isso o `compose.prod.yaml` só publica portas no `web`.
-4. Atualizações automáticas: `sudo apt-get install -y unattended-upgrades && sudo dpkg-reconfigure -plow unattended-upgrades`.
-
-### 1.2 Docker
-
-Instalar o Docker Engine e o plugin Compose pelo [repositório oficial](https://docs.docker.com/engine/install/ubuntu/) (não usar o pacote `docker.io` do Ubuntu). Conferir com `docker compose version`. Garantir `rsync` e `curl`: `sudo apt-get install -y rsync curl`.
-
-### 1.3 Usuário `deploy`
-
-O GitHub Actions entra no VPS como `deploy`. Ele fica no grupo `docker` (o que equivale a root no host) e **sem sudo**.
+### 1.1 Pré-checagem
 
 ```bash
-sudo adduser --disabled-password --gecos "" deploy
-sudo usermod -aG docker deploy
-sudo mkdir -p /opt/vocab/deploy/secrets
-sudo chown -R deploy:deploy /opt/vocab
-sudo chmod 700 /opt/vocab/deploy/secrets
+ss -tlnp | grep :9001 || echo "9001 livre"   # porta reservada para o vocab
+docker compose version
+free -h && df -h /                            # o compose do vocab limita ~2,8 GB no total
+apt-get install -y rsync curl                 # o CI usa rsync; o deploy.sh usa curl
 ```
+
+### 1.2 Usuário `deploy`
+
+O GitHub Actions entra na VPS como `deploy`, dono de `/opt/vocab`. Ele fica no grupo `docker` (o que equivale a root no host) e **sem sudo**.
+
+```bash
+adduser --disabled-password --gecos "" deploy
+usermod -aG docker deploy
+mkdir -p /opt/vocab/deploy/secrets
+chown -R deploy:deploy /opt/vocab
+chmod 700 /opt/vocab/deploy/secrets
+```
+
+> O grupo `docker` dá ao `deploy` controle sobre **todos** os containers da VPS, inclusive os do GBS. A chave dele é exclusiva do CI e fica só no Environment `production` do GitHub.
 
 Gere, **na sua máquina**, um par de chaves exclusivo do deploy (sem passphrase, já que o CI o usa):
 
@@ -69,18 +76,18 @@ No VPS, coloque a chave **pública** em `~deploy/.ssh/authorized_keys` com restr
 sudo -u deploy mkdir -p -m 700 /home/deploy/.ssh
 echo 'no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA... vocab-deploy' \
   | sudo -u deploy tee /home/deploy/.ssh/authorized_keys
-sudo chmod 600 /home/deploy/.ssh/authorized_keys
+chmod 600 /home/deploy/.ssh/authorized_keys
 ```
 
 A chave **privada** vai só para o secret `DEPLOY_SSH_KEY` do Environment `production` (seção 2). Para revogar o acesso do CI, basta remover essa linha do `authorized_keys`.
 
-### 1.4 Configuração e segredos
+### 1.3 Configuração e segredos
 
-`/opt/vocab/.env` (dono `deploy`, `chmod 600`):
+`/opt/vocab/.env` (dono `deploy`, `chmod 600`; crie com `sudo -u deploy sh -c 'umask 077; cat > /opt/vocab/.env'` e cole o conteúdo):
 
 ```dotenv
 APP_ENV=production
-APP_DOMAIN=vocab.<domínio>
+APP_DOMAIN=vocab.gbs-software.com.br
 LOG_LEVEL=INFO
 LOG_FORMAT=json
 POSTGRES_HOST=db
@@ -98,14 +105,36 @@ Senha do Postgres:
 
 ```bash
 sudo -u deploy sh -c 'umask 077; openssl rand -base64 32 | tr -d "\n" > /opt/vocab/deploy/secrets/postgres_password'
-sudo chmod 444 /opt/vocab/deploy/secrets/postgres_password
+chmod 444 /opt/vocab/deploy/secrets/postgres_password
 ```
 
 **Por que 444 e não 600:** sem Swarm, o Compose monta o arquivo de secret por bind mount, preservando dono e modo do host. O processo da `api` roda como `app` (uid 1000) dentro do container. Com `600`, ele só conseguiria ler o arquivo se o `deploy` também tivesse uid 1000. A proteção fica no diretório `secrets/` (`700`, dono `deploy`): nenhum outro usuário do host chega ao arquivo. A senha só é usada pelo Postgres na **primeira** inicialização do volume `db_data`; trocá-la depois exige `ALTER USER` no banco.
 
-### 1.5 DNS (Registro.br)
+### 1.4 DNS (Registro.br)
 
-Registro `A` `vocab` → IP do VPS (e `AAAA` se houver IPv6). Confira antes do primeiro deploy: `dig +short vocab.<domínio>`. O Caddy só consegue emitir o certificado quando o domínio já aponta para o VPS.
+Na zona `gbs-software.com.br`: registro `A` `vocab` → IP da VPS. Confira antes de seguir: `dig +short vocab.gbs-software.com.br`. O Caddy do host só consegue emitir o certificado quando o domínio já aponta para a VPS.
+
+### 1.5 Caddy do host
+
+Acrescente ao `/etc/caddy/Caddyfile` (sem o snippet `gbs_cliente`, que é do GBS):
+
+```caddy
+vocab.gbs-software.com.br {
+	reverse_proxy 127.0.0.1:9001
+}
+```
+
+```bash
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && systemctl reload caddy
+```
+
+Se a config for inválida, o reload falha e a anterior continua no ar (o GBS não cai). Até o primeiro deploy, `https://vocab.gbs-software.com.br` responde `502`, porque ainda não há nada na `9001`. O certificado é emitido mesmo assim (`journalctl -u caddy --since "5 min ago"`).
+
+HTTPS, redirect HTTP → HTTPS e HTTP/3 são do Caddy do host. Headers de segurança, cache e fallback da SPA ficam no `frontend/Caddyfile` (versionado, dentro da imagem `web`).
+
+### 1.6 Registrar no guia da VPS
+
+O guia da VPS manda registrar toda aplicação nova. Atualize as seções 3 (`/opt/vocab`), 4 (stack `vocab`), 6 (porta 9001, registro DNS, bloco do Caddy) e o histórico. Atualize também a cópia de referência do Caddyfile do host.
 
 ## 2. GitHub (uma vez)
 
@@ -119,7 +148,7 @@ Registro `A` `vocab` → IP do VPS (e `AAAA` se houver IPv6). Confira antes do p
    | `DEPLOY_SSH_KEY` | conteúdo de `~/.ssh/vocab-deploy` (chave privada) |
    | `DEPLOY_KNOWN_HOSTS` | saída de `ssh-keyscan -t ed25519 <host>`, **conferida** contra a fingerprint vista no console do VPS (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`) |
 
-3. Variável do Environment: `APP_DOMAIN` = `vocab.<domínio>`.
+3. Variável do Environment: `APP_DOMAIN` = `vocab.gbs-software.com.br`.
 4. Depois do primeiro push de imagens, conferir em **Packages** que `vocab-api` e `vocab-web` estão ligados ao repositório (o `LABEL org.opencontainers.image.source` das imagens faz isso). Sem a ligação, o `GITHUB_TOKEN` do deploy não consegue fazer `pull`.
 
 ## 3. Deploy
@@ -155,10 +184,11 @@ dc run --rm api python -m app.cli create-user <seu-email>   # senha via prompt (
 ```bash
 dc ps                       # estado dos serviços
 dc logs -f --tail=100 api   # logs da api (JSON); também: web, db, migrate
+curl -s http://127.0.0.1:9001/api/v1/health   # direto no web, sem o Caddy do host
 dc exec db psql -U vocab vocab
 ```
 
-Confira nos logs da `api` que o IP real do cliente aparece nas linhas de acesso. O rate limit de login depende disso (`--proxy-headers`). Se aparecer sempre o mesmo IP interno do Docker, todos os clientes estão dividindo um único limite.
+Confira nos logs da `api` que o IP real do cliente aparece nas linhas de acesso. O rate limit de login depende disso. O Caddy do host monta o `X-Forwarded-For`, o Caddy do `web` o repassa (`trusted_proxies`) e a `api` o lê (`--proxy-headers`). Se aparecer sempre o mesmo IP interno do Docker, todos os clientes estão dividindo um único limite.
 
 ## 4. Rollback (manual)
 
@@ -181,11 +211,12 @@ Depois, faça o rollback normal para a tag anterior.
 
 | Volume | Conteúdo | Perder significa |
 |---|---|---|
-| `db_data` | Banco de dados | Perda de dados (até a E1, só o usuário; depois, restaurar do backup) |
-| `caddy_data` / `caddy_config` | Certificados e estado do Caddy | Reemissão de certificados; repetir isso esbarra no rate limit do Let's Encrypt |
+| `vocab_db_data` | Banco de dados | Perda de dados (até a E1, só o usuário; depois, restaurar do backup) |
+
+Os certificados ficam com o Caddy do host (`/var/lib/caddy/`), fora deste projeto.
 
 Nunca rode `docker compose down -v` em produção.
 
 ## 6. Backup e restore
 
-**Pendente (entra na E1).** Até lá, o banco só tem o usuário criado pela CLI, recriável em segundos. O desenho já está decidido (spec §11.7, ADR 0002): `backup.sh` diário via systemd timer → `pg_dump -Fc` → `age` → `rclone` para B2/R2 → ping no Healthchecks.io; restore com `age -d` + `pg_restore --clean --if-exists`, testado no setup.
+**Pendente (entra na E1).** Terá script e timer próprios, em `/opt/vocab` (o `backup-gbs.sh` do GBS só varre `/opt/gbs/*`), e entrará no registro do guia da VPS. Até lá, o banco só tem o usuário criado pela CLI, recriável em segundos. O desenho já está decidido (spec §11.7, ADR 0002): `backup.sh` diário via systemd timer → `pg_dump -Fc` → `age` → `rclone` para B2/R2 → ping no Healthchecks.io; restore com `age -d` + `pg_restore --clean --if-exists`, testado no setup.

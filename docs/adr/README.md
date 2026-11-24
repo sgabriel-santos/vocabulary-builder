@@ -4,7 +4,7 @@ Decisões arquiteturais do Vocabulary Builder. Formato curto: Status, Data, Cont
 
 | ADR | Título | Status |
 |---|---|---|
-| [0001](0001-hosting-vps-compose-caddy.md) | Hospedagem em VPS com Docker Compose e Caddy | Aceita |
+| [0001](0001-hosting-vps-compose-caddy.md) | Hospedagem em VPS com Docker Compose e Caddy | Aceita (Caddy substituído pelo 0013) |
 | [0002](0002-postgres-on-vps-with-offsite-backup.md) | Postgres em container no VPS com backup externo | Aceita |
 | [0003](0003-auth-password-server-side-sessions.md) | Autenticação por senha com sessão server-side | Aceita |
 | [0004](0004-python-tooling-uv-python-314.md) | Ferramentas Python: uv e Python 3.14 | Aceita |
@@ -16,6 +16,7 @@ Decisões arquiteturais do Vocabulary Builder. Formato curto: Status, Data, Cont
 | [0010](0010-docker-images-and-compose-layout.md) | Imagens Docker e organização do Compose | Aceita |
 | [0011](0011-ci-cd-auto-deploy-with-rollback.md) | CI/CD com GitHub Actions, deploy automático e rollback manual | Aceita |
 | [0012](0012-branching-pr-squash-merge.md) | Branching com PR e squash merge | Aceita |
+| [0013](0013-shared-edge-caddy-on-host.md) | Caddy de borda compartilhado no host da VPS | Aceita |
 
 ## Template
 

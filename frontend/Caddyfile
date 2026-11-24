@@ -1,6 +1,13 @@
-# Produção: HTTPS automático (Let's Encrypt) para APP_DOMAIN.
-# /api/* vai para a api; o resto é a SPA (fallback para index.html).
-{$APP_DOMAIN} {
+# TLS no Caddy do host (ADR 0013)
+{
+	auto_https off
+	servers {
+		# Preserva o X-Forwarded-For do Caddy do host (rate limit de login por IP real)
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
 	encode zstd gzip
 
 	handle /api/* {
@@ -21,10 +28,8 @@
 		-Server
 	}
 
-	# Assets com hash no nome: cache longo. Todo o resto (index.html servido em
-	# qualquer rota da SPA, sw.js, manifest, ícones) revalida a cada acesso.
-	# O `header` roda antes do try_files, então casar `path /index.html` não pegaria
-	# as navegações; `?` só define o header se a resposta (ex.: da api) não tiver um.
+	# `header` roda antes do try_files: `path /index.html` não pegaria as navegações da SPA.
+	# `?` preserva o Cache-Control vindo da api.
 	@immutable path /assets/*
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
 	@revalidate not path /assets/*

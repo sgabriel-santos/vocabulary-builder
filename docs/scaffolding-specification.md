@@ -54,7 +54,7 @@ A E0 **não entrega nenhuma funcionalidade `F-xx`**. Ela entrega o caminho compl
 
 | Tema | Decisão | ADR |
 |---|---|---|
-| Hospedagem | VPS Hostinger KVM 2 (BR) + Docker Compose + Caddy (HTTPS automático, mesma origem) | [0001](adr/0001-hosting-vps-compose-caddy.md) |
+| Hospedagem | VPS compartilhada (BR) + Docker Compose; HTTPS no Caddy de borda do host, Caddy da imagem `web` servindo SPA + `/api` (mesma origem) | [0001](adr/0001-hosting-vps-compose-caddy.md), [0013](adr/0013-shared-edge-caddy-on-host.md) |
 | Banco | Postgres 18 em container no VPS + backup diário criptografado externo (a partir da E1) | [0002](adr/0002-postgres-on-vps-with-offsite-backup.md) |
 | Autenticação | E-mail + senha (Argon2) + sessão server-side em cookie `HttpOnly` | [0003](adr/0003-auth-password-server-side-sessions.md) |
 | Python | `uv` + Python 3.14 | [0004](adr/0004-python-tooling-uv-python-314.md) |
@@ -74,15 +74,17 @@ Padrões de baixo impacto (task runner, hooks, logging, type checker, UI, lint, 
 ```
                 Internet (HTTPS 443 / HTTP 80 → redirect)
                                 │
-         DNS: vocab.<domínio>  →  IP do VPS (registro A)
+    DNS: vocab.gbs-software.com.br  →  IP da VPS (registro A)
                                 │
-┌─────────────────────────── VPS (Ubuntu 24.04 + Docker) ─────────────────────────┐
-│  ┌──────────────────────────────────────────────┐                               │
-│  │ web (Caddy + build do SPA)  :80 :443 :443/udp│  ← único serviço com portas   │
+┌──────────────── VPS compartilhada (Ubuntu 26.04 + Docker) ──────────────────────┐
+│  Caddy do host (systemd, :80 :443, Let's Encrypt) ── borda de todas as apps     │
+│        │ vocab.gbs-software.com.br → 127.0.0.1:9001      (ADR 0013)             │
+│  ┌─────▼────────────────────────────────────────┐                               │
+│  │ web (Caddy + build do SPA)  127.0.0.1:9001→80│  ← único serviço com porta    │
 │  │   /api/*  → reverse_proxy api:8000           │                               │
 │  │   /*      → arquivos estáticos (fallback SPA)│                               │
 │  └───────────────────────┬──────────────────────┘                               │
-│              rede interna│do Compose                                            │
+│              rede interna│do Compose (projeto `vocab`)                          │
 │  ┌───────────────────────▼──────┐   ┌────────────────────┐   ┌───────────────┐  │
 │  │ api (FastAPI / uvicorn)      │──▶│ db (postgres:18)   │◀──│ migrate       │  │
 │  └──────────────────────────────┘   │ volume db_data     │   │ (one-off)     │  │
@@ -252,7 +254,7 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 | just | via `uv tool install rust-just` | Task runner (seção 13). |
 | Docker Engine + Compose v2 | atual | Dev (Postgres) e produção. |
 | PostgreSQL | **18** (`postgres:18-alpine`, minor fixada) | Mesma versão em dev, testes e produção. |
-| Caddy | **2.x** (`caddy:2.<x>-alpine`) | Proxy reverso, HTTPS automático, arquivos estáticos. |
+| Caddy | **2.x** (`caddy:2.<x>-alpine`) | Na imagem `web`: proxy de `/api` e arquivos estáticos, só HTTP. O HTTPS é do Caddy do host (ADR 0013). |
 
 ### 3.2 Backend — dependências de runtime
 
@@ -309,7 +311,7 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 
 | Item | Escolha | Observação |
 |---|---|---|
-| VPS | Hostinger KVM 2 (2 vCPU / 8 GB / 100 GB NVMe), data center Brasil, x86_64 | Ubuntu 24.04 LTS sem painel. |
+| VPS | Hostinger KVM 2 (2 vCPU / 8 GB / 100 GB NVMe), data center Brasil, x86_64 | Ubuntu 26.04 LTS; compartilhada com outras aplicações (ADR 0013). |
 | Domínio / DNS | Registro.br, DNS do Registro.br | Registro `A` `vocab` → IP do VPS (e `AAAA` se houver IPv6). |
 | Registry | GHCR (`ghcr.io/sgabriel-santos/vocab-api`, `.../vocab-web`) | Tags = SHA do commit. |
 | Backup externo (E1) | Backblaze B2 ou Cloudflare R2 | Camada gratuita basta. |
@@ -383,7 +385,7 @@ Versões: as **linhas** abaixo são decisões; as versões exatas (patch/minor) 
 ```dotenv
 # ---------- Aplicação ----------
 APP_ENV=development              # development | test | production
-APP_DOMAIN=localhost             # Produção: vocab.<domínio> (usado pelo Caddy e pela checagem de Origin)
+APP_DOMAIN=localhost             # Produção: vocab.gbs-software.com.br (checagem de Origin e smoke test)
 LOG_LEVEL=INFO                   # DEBUG | INFO | WARNING | ERROR
 LOG_FORMAT=console               # console (dev) | json (produção)
 
@@ -413,7 +415,7 @@ IMAGE_TAG=                       # SHA do commit em produção (definido pelo de
 | Variável | Uso |
 |---|---|
 | `APP_ENV` | Ajusta defaults (formato de log, cookies `Secure`, docs do OpenAPI: `/api/docs` habilitado fora de produção). |
-| `APP_DOMAIN` | Origem esperada (`https://<APP_DOMAIN>`) na checagem de `Origin`; site do Caddyfile em produção. |
+| `APP_DOMAIN` | Origem esperada (`https://<APP_DOMAIN>`) na checagem de `Origin`; URL do smoke test do deploy. |
 | `LOG_LEVEL`, `LOG_FORMAT` | Configuração do structlog. |
 | `POSTGRES_*` | Montam a URL `postgresql+psycopg://...` no `Settings` (propriedade `database_url`). |
 | `SESSION_*` | Nome, validade e flag `Secure` do cookie de sessão. |
@@ -463,7 +465,7 @@ Apenas as colunas que a E0 usa. Os demais campos do `User` (overview §9.2: `dis
 
 **CSRF**: `SameSite=Lax` + mesma origem + dependency que, em `POST/PUT/PATCH/DELETE`, exige header `Origin` igual a `https://<APP_DOMAIN>` (em dev: `http://localhost:5173` e `http://localhost:8000`). Requisições sem `Origin` em métodos mutáveis são rejeitadas (`403`).
 
-**Rate limit**: implementação em memória por IP no endpoint de login (`core/rate_limit.py`), suficiente para uma instância única. O IP real vem dos headers do Caddy (`--proxy-headers` + `--forwarded-allow-ips` restrito à rede interna).
+**Rate limit**: implementação em memória por IP no endpoint de login (`core/rate_limit.py`), suficiente para uma instância única. O IP real vem do `X-Forwarded-For` montado pelo Caddy do host e repassado pelo Caddy da imagem `web` (`trusted_proxies`), lido com `--proxy-headers` + `--forwarded-allow-ips`.
 
 **Relógio**: toda lógica de expiração usa o port `Clock`; testes usam `FakeClock`.
 
@@ -696,7 +698,7 @@ stage build: node:26-slim
 stage runtime: caddy:2.<x>-alpine
   COPY Caddyfile /etc/caddy/Caddyfile
   COPY --from=build /app/dist /srv
-  EXPOSE 80 443 443/udp
+  EXPOSE 80                                               # só HTTP: TLS no Caddy do host (ADR 0013)
 ```
 
 - Rodar o Caddy como usuário não-root se o binário oficial mantiver a capability `cap_net_bind_service` (validar na implementação); senão, manter o usuário padrão com filesystem read-only onde possível.
@@ -705,7 +707,14 @@ stage runtime: caddy:2.<x>-alpine
 **Caddyfile** (referência):
 
 ```caddyfile
-{$APP_DOMAIN} {
+{
+    auto_https off                                # TLS e redirect HTTP → HTTPS: Caddy do host
+    servers {
+        trusted_proxies static private_ranges     # aceita os X-Forwarded-* do Caddy do host
+    }
+}
+
+:80 {
     encode zstd gzip
 
     handle /api/* {
@@ -748,13 +757,13 @@ stage runtime: caddy:2.<x>-alpine
 | `db` | `postgres:18-alpine` (minor fixada) | Volume `db_data:/var/lib/postgresql`; `POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password`; healthcheck `pg_isready`; sem `ports`. |
 | `migrate` | `ghcr.io/sgabriel-santos/vocab-api:${IMAGE_TAG}` | `command: alembic upgrade head`; `restart: "no"`; `depends_on: db (service_healthy)`. |
 | `api` | `ghcr.io/sgabriel-santos/vocab-api:${IMAGE_TAG}` | `depends_on: db (service_healthy), migrate (service_completed_successfully)`; `env_file: ../.env`; secret `postgres_password`; sem `ports`. |
-| `web` | `ghcr.io/sgabriel-santos/vocab-web:${IMAGE_TAG}` | `ports: 80:80, 443:443, 443:443/udp`; volumes `caddy_data:/data`, `caddy_config:/config` (**obrigatórios**: preservam certificados); `APP_DOMAIN` do `.env`; `depends_on: api`. |
+| `web` | `ghcr.io/sgabriel-santos/vocab-web:${IMAGE_TAG}` | `ports: 127.0.0.1:9001:80` (o Caddy do host faz o proxy para cá; ADR 0013); sem volumes; `depends_on: api`. |
 
-Comum a todos: `restart: unless-stopped` (exceto `migrate`), logging `json-file` com `max-size: 10m`, `max-file: "3"`, rede interna única; **nunca** montar `/var/run/docker.sock`.
+Projeto com nome fixo (`name: vocab`), para prefixar containers, rede e volumes na VPS compartilhada. Comum a todos: `restart: unless-stopped` (exceto `migrate`), logging `json-file` com `max-size: 10m`, `max-file: "3"`, rede interna única; **nunca** montar `/var/run/docker.sock`.
 
 Limites (`deploy.resources.limits`): `api` 1 CPU / 1 GB; `db` 1 CPU / 1 GB; `web` 0.5 CPU / 256 MB; `migrate` 0.5 CPU / 512 MB.
 
-Volumes nomeados: `db_data`, `caddy_data`, `caddy_config`. Secrets: `postgres_password: file: ./secrets/postgres_password`.
+Volume nomeado: `db_data`. Secrets: `postgres_password: file: ./secrets/postgres_password`.
 
 ### 11.5 Layout no VPS
 
@@ -772,12 +781,12 @@ Volumes nomeados: `db_data`, `caddy_data`, `caddy_config`. Secrets: `postgres_pa
 
 ### 11.6 Setup inicial do VPS (runbook em `deploy/README.md`)
 
-1. Criar o VPS com Ubuntu 24.04 LTS (sem painel), cadastrando a chave SSH pessoal.
-2. Hardening: usuário administrativo com sudo, `PasswordAuthentication no`, `PermitRootLogin no`; `ufw` (ou firewall do provedor) liberando 22, 80, 443/tcp e 443/udp; `unattended-upgrades` ativo.
-3. Instalar Docker Engine + plugin Compose (repositório oficial da Docker).
+1. A VPS é **compartilhada** com outras aplicações (ADR 0013): sistema, Docker, Caddy do host, hardening e firewall já existem e são geridos pelo guia da VPS, fora deste projeto. A operação administrativa é como `root`.
+2. Conferir que a porta `9001` está livre (`ss -tlnp | grep :9001`) e registrá-la no guia da VPS.
+3. Garantir `rsync` e `curl` no host.
 4. Criar usuário `deploy` (grupo `docker`, **sem sudo**), com a chave pública de deploy em `authorized_keys` (opções `no-port-forwarding,no-agent-forwarding,no-X11-forwarding`). Não usar `command=`: o CI copia `deploy/` a cada deploy (o que um comando forçado bloquearia) e o grupo `docker` já equivale a root no host, então a restrição não protegeria nada. A proteção está no acesso à chave (seção 12.2). O `deploy.sh` valida o SHA recebido (`^[0-9a-f]{40}$`).
 5. Criar `/opt/vocab/.env` (`chmod 600`) e `/opt/vocab/deploy/secrets/postgres_password` (senha forte, `chmod 444`, dentro de `secrets/` com `chmod 700` e dono `deploy`; ver 5.4).
-6. DNS no Registro.br: registro `A` `vocab` → IP do VPS (e `AAAA` se houver IPv6).
+6. DNS no Registro.br (zona `gbs-software.com.br`): registro `A` `vocab` → IP da VPS. Depois, bloco `vocab.gbs-software.com.br { reverse_proxy 127.0.0.1:9001 }` no `/etc/caddy/Caddyfile` do host, `caddy validate` e `systemctl reload caddy`.
 7. Primeiro deploy via GitHub Actions; criar o usuário com `create-user`.
 8. **Na E1:** configurar o backup (11.7) e testar um restore.
 

@@ -418,7 +418,7 @@ Regra: toda alteração no modelo do aprendiz é registrada como `KnowledgeEvent
 | Testes backend | **pytest + pytest-asyncio + testcontainers** | [ADR 0007](adr/0007-backend-testing-testcontainers.md). |
 | Roteamento / estado de servidor | **TanStack Router + TanStack Query** | [ADR 0008](adr/0008-frontend-routing-tanstack-router.md). |
 | Client da API | **openapi-typescript + openapi-fetch + openapi-react-query** | [ADR 0009](adr/0009-api-client-openapi-fetch-versioned.md). |
-| Hospedagem | **VPS + Docker Compose + Caddy** | [ADR 0001](adr/0001-hosting-vps-compose-caddy.md), [ADR 0002](adr/0002-postgres-on-vps-with-offsite-backup.md), [ADR 0010](adr/0010-docker-images-and-compose-layout.md). |
+| Hospedagem | **VPS + Docker Compose + Caddy** | [ADR 0001](adr/0001-hosting-vps-compose-caddy.md), [ADR 0002](adr/0002-postgres-on-vps-with-offsite-backup.md), [ADR 0010](adr/0010-docker-images-and-compose-layout.md), [ADR 0013](adr/0013-shared-edge-caddy-on-host.md) (TLS no Caddy de borda do host, compartilhado com outras aplicações da VPS). |
 | Autenticação | **E-mail + senha (Argon2) + sessão server-side** | [ADR 0003](adr/0003-auth-password-server-side-sessions.md). |
 | Qualidade | **Ruff, mypy strict, ESLint + Prettier, Vitest + Testing Library + MSW, pre-commit** | Detalhes na [especificação do scaffolding](scaffolding-specification.md#9-ferramentas-de-qualidade). |
 | UI / PWA | **Tailwind CSS v4 + shadcn/ui, vite-plugin-pwa** | Especificação do scaffolding, seção 8. |
