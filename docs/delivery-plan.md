@@ -30,6 +30,8 @@ Ao final da E5, o **critério de pronto do MVP** (seção 14) é atingido.
 
 ## E0 — Esqueleto no ar (walking skeleton)
 
+**Status:** ✅ concluída (registro na S5 do [`scaffolding-blueprint.md`](scaffolding-blueprint.md#74-registro-de-sessões)).
+
 **Objetivo:** aplicação vazia rodando em produção, com todo o caminho do código até o deploy funcionando.
 
 **Escopo:**
