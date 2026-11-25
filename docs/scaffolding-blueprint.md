@@ -841,8 +841,8 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 | S5 | T-27 | Environment do GitHub (manual) | ✅ | — (manual) |
 | S5 | T-28 | deploy.yml e Dependabot | ✅ | commit da T-28 |
 | S5 | T-29 | PR, merge e primeiro deploy | ✅ | `fab790c` (PR #2) |
-| S5 | T-30 | Ruleset da main (manual) | ⬜ | |
-| S5 | T-31 | Validação final | ⬜ | |
+| S5 | T-30 | Ruleset da main (manual) | ✅ | — (manual) |
+| S5 | T-31 | Validação final | 🔄 | |
 
 ### 7.4 Registro de sessões
 
@@ -936,4 +936,5 @@ Status: ⬜ pendente · 🔄 em andamento · ✅ concluída · ⏭️ pulada (ex
 - **Em aberto:** confirmar no primeiro deploy que a `api` lê `/run/secrets/postgres_password` (`444`) com o uid real do `deploy`. Continuam em aberto o `Max-Age` fixo do cookie (S2) e a PWA no celular (T-31).
 - **T-29 concluída:** PR #2 com CI verde e squash merge (`fab790c`). O primeiro `deploy.yml` passou (`ci` → `build-and-push` em paralelo → `deploy` em 36 s; o smoke test passou na 2ª tentativa, com a api ainda iniciando). Conferido de fora: `/api/v1/health` → `{"status":"ok","database":"ok"}`, o que confirma que a `api` lê o secret `444` com o uid real do `deploy`; `/login` com HSTS e `no-cache`; HTTP → `308`. Usuário real criado com `create-user`, e o login em produção foi validado pelo usuário.
 - **Ajustes após o primeiro deploy** (PR seguinte, que também serve de "PR trivial" da T-31): `cache-dependency-glob: uv.lock` no `ci.yml` (o caminho é relativo ao `working-directory: backend`; com `backend/uv.lock` o cache nunca invalidava). `DEPLOY_USER` passou de secret a variável do Environment: o GitHub mascarava como `***` toda ocorrência de "deploy" nos logs.
-- **Próximo passo:** T-30 (ruleset da `main`) e T-31 (PWA no celular, deploy por PR trivial, rollback, E0 concluída no `delivery-plan.md`).
+- **T-30 concluída:** no plano Free, ruleset e proteção de branch não são aplicados em repositório privado (a API responde `403`). O repositório passou a ser **público**, depois de uma varredura sem achados (gitleaks no histórico inteiro, sem IP da VPS nem segredos versionados). Configurado: só squash merge, deleção automática de branches e o ruleset `main` ativo, sem bypass, com bloqueio de deleção e force push, histórico linear, PR obrigatório (0 aprovações, só squash) e os checks `backend`/`frontend`/`contract`/`secrets`. A opção "Require branches to be up to date" ficou desligada. Validado pela API.
+- **Próximo passo:** T-31. Merge do PR #6 e acompanhamento do deploy automático (conferir que "deploy" não aparece mais como `***` nos logs); instalar a PWA no celular; testar o rollback (`just deploy-rollback <sha anterior>` ou Actions → Deploy → Run workflow) e conferir `current_tag`; marcar a E0 como concluída no `delivery-plan.md`. Depois, os PRs do Dependabot (#3–#5), um por vez.
