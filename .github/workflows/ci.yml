@@ -37,7 +37,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           working-directory: backend
           enable-cache: true
-          cache-dependency-glob: backend/uv.lock
+          cache-dependency-glob: uv.lock
       - uses: extractions/setup-just@v4
         with:
           just-version: ${{ env.JUST_VERSION }}
@@ -92,7 +92,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           working-directory: backend
           enable-cache: true
-          cache-dependency-glob: backend/uv.lock
+          cache-dependency-glob: uv.lock
       - uses: pnpm/action-setup@v6
         with:
           package_json_file: frontend/package.json

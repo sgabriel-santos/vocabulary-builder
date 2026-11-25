@@ -71,7 +71,7 @@ jobs:
     env:
       SHA: ${{ inputs.sha || github.sha }}
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
     steps:
       - name: Validate SHA
         run: |

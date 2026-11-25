@@ -144,11 +144,10 @@ O guia da VPS manda registrar toda aplicação nova. Atualize as seções 3 (`/o
    | Secret | Valor |
    |---|---|
    | `DEPLOY_HOST` | IP ou hostname do VPS |
-   | `DEPLOY_USER` | `deploy` |
    | `DEPLOY_SSH_KEY` | conteúdo de `~/.ssh/vocab-deploy` (chave privada) |
    | `DEPLOY_KNOWN_HOSTS` | saída de `ssh-keyscan -t ed25519 <host>`, **conferida** contra a fingerprint vista no console do VPS (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`) |
 
-3. Variável do Environment: `APP_DOMAIN` = `vocab.gbs-software.com.br`.
+3. Variáveis do Environment: `APP_DOMAIN` = `vocab.gbs-software.com.br` e `DEPLOY_USER` = `deploy`. O `DEPLOY_USER` é variável, não secret: o GitHub mascara nos logs todo texto igual ao valor de um secret, e "deploy" apareceria como `***`.
 4. Depois do primeiro push de imagens, conferir em **Packages** que `vocab-api` e `vocab-web` estão ligados ao repositório (o `LABEL org.opencontainers.image.source` das imagens faz isso). Sem a ligação, o `GITHUB_TOKEN` do deploy não consegue fazer `pull`.
 
 ## 3. Deploy
